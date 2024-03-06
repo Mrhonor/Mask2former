@@ -640,7 +640,7 @@ class HighResolutionNet(Backbone):
         self.MODEL_WEIGHTS = cfg.MODEL.WEIGHTS
         self.init_weights()
     
-    def frozen(self, isFrooze):
+    def req_grad(self, isFrooze):
         for name, param in self.named_parameters():
             param.requires_grad = isFrooze
 

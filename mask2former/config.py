@@ -176,6 +176,7 @@ def add_gnn_config(cfg):
     # mask_former model config
     cfg.MODEL.GNN = CN()
     
+    cfg.MODEL.GNN.GNN_MODEL_NAME = "Learnable_Topology_BGNN"
     cfg.MODEL.GNN.NFEAT = 1024
     cfg.MODEL.GNN.NFEAT_OUT = 512
     cfg.MODEL.GNN.nfeat_adj = 256
@@ -199,4 +200,5 @@ def add_gnn_config(cfg):
     
     
     cfg.LOSS.WITH_SPA_LOSS = True
+
     
