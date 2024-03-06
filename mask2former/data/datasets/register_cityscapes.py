@@ -43,7 +43,7 @@ labels_info = [
     {"hasInstances": False, "category": "vehicle", "catid": 7, "name": "license plate", "ignoreInEval": True, "id": -1, "color": [0, 0, 142], "trainId": 255}
 ]
 
-dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/'
+dataroot = '/home1/marong/datasets/'
 annpath = f'mask2former/datasets/Cityscapes/val.txt'
 def cs():
     # assert mode in ('train', 'eval', 'test')

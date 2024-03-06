@@ -11,6 +11,7 @@ import math
 from detectron2.config import configurable
 from detectron2.layers import Conv2d
 from detectron2.utils.registry import Registry
+from timm.models.layers import trunc_normal_
 
 GNN_REGISTRY = Registry("GNN_MODULE")
 GNN_REGISTRY.__doc__ = """
@@ -425,7 +426,7 @@ class Learnable_Topology_BGNN(nn.Module):
         
         self.num_unify_class = num_unify_class
         
-        self.unify_node_features = nn.Parameter(torch.randn(self.max_num_unify_class, self.nfeat), requires_grad=True)
+        self.unify_node_features = nn.Parameter(torch.randn(self.num_unify_class, self.nfeat), requires_grad=True)
         # self.register_buffer("fix_node_features", torch.randn(self.total_cats, self.nfeat))
         # self.datasets_node_features = nn.Parameter(torch.randn(self.total_cats, self.nfeat), requires_grad=False)
         
@@ -436,7 +437,7 @@ class Learnable_Topology_BGNN(nn.Module):
         
         ## Graph adjacency matrix
         # self.adj_matrix = nn.Parameter(torch.rand(self.total_cats+self.num_unify_class, self.total_cats+self.num_unify_class), requires_grad=True)
-        self.adj_matrix = nn.Parameter(torch.rand(self.total_cats+self.n_datasets, self.num_unify_class), requires_grad=True)
+        self.adj_matrix = nn.Parameter(torch.rand(self.total_cats, self.num_unify_class), requires_grad=True)
         # self.init_adjacency_matrix()
         if self.mse_or_adv == 'adv':
             self.netD1 = Discriminator(self.nfeat_out, 128, 1, self.dropout_rate)
@@ -452,13 +453,14 @@ class Learnable_Topology_BGNN(nn.Module):
         if self.use_km:
             self.km_algorithms = Munkres()
         # else:
+        self.init_stage = False
         if init_adj_path != None:
-            init_adj = torch.load(configer.get('GNN', 'init_adj_path'))
-        
+            init_adj = torch.load(init_adj_path)
+            self.init_stage = True
             self.set_adj_matrix(init_adj, grad=False)
         
             
-        self.beta = [ot.unif(self.dataset_cats[i]+1) for i in range(0, self.n_datasets)]
+        self.beta = [ot.unif(self.dataset_cats[i]) for i in range(0, self.n_datasets)]
         self.uot_update = 0
         self.uot_bi = None
         self.GumbelSoftmax = isGumbelSoftmax
@@ -468,7 +470,7 @@ class Learnable_Topology_BGNN(nn.Module):
         # self.init_weight()
 
     @classmethod
-    def from_config(cls, cfg, in_channels, mask_classification):
+    def from_config(cls, cfg):
         ret = {}
 
 
@@ -477,7 +479,7 @@ class Learnable_Topology_BGNN(nn.Module):
         
         ret["nfeat_adj"] = cfg.MODEL.GNN.nfeat_adj
         ret["adj_feat_dim"] = cfg.MODEL.GNN.adj_feat_dim
-        ret["output_feat_dim"] = cfg.MODEL.SEM_SEG_HEAD.output_feat_dim
+        ret["output_feat_dim"] = cfg.MODEL.SEM_SEG_HEAD.OUTPUT_FEAT_DIM
         
         ret["dropout_rate"] = cfg.MODEL.GNN.dropout_rate
         ret["threshold_value"] = cfg.MODEL.GNN.threshold_value
@@ -490,11 +492,11 @@ class Learnable_Topology_BGNN(nn.Module):
         ret["with_datasets_aux"] = cfg.MODEL.GNN.with_datasets_aux
         ret["init_stage_iters"] = cfg.MODEL.GNN.init_stage_iters
         
-        ret["dataset_cats"] = cfg.MODEL.GNN.dataset_cats
-        ret["num_unify_class"] = cfg.MODEL.GNN.num_unify_class
+        ret["dataset_cats"] = cfg.DATASETS.DATASETS_CATS
+        ret["num_unify_class"] = cfg.DATASETS.NUM_UNIFY_CLASS
         ret["isGumbelSoftmax"] = cfg.MODEL.GNN.isGumbelSoftmax
         
-        ret["num_classes"] = cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES
+        # ret["num_classes"] = cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES
         ret["init_adj_path"] = cfg.MODEL.GNN.INIT_ADJ_PATH
  
         # ret["graph_node_features"] = 
@@ -544,7 +546,7 @@ class Learnable_Topology_BGNN(nn.Module):
             
         feat_out = self.linear1(feat_gcn3)
 
-        ret_feats = [feat_gcn1[self.total_cats+self.n_datasets:], feat_gcn2[self.total_cats+self.n_datasets:], feat_gcn3[self.total_cats+self.n_datasets:], feat_out[self.total_cats+self.n_datasets:]]
+        ret_feats = [feat_gcn1[self.total_cats:], feat_gcn2[self.total_cats:], feat_gcn3[self.total_cats:], feat_out[self.total_cats:]]
 
         adv_out = {}
         if self.mse_or_adv == 'adv':
@@ -559,7 +561,7 @@ class Learnable_Topology_BGNN(nn.Module):
             # adv_out['ADV4'] = [feat_gcn3.detach(), feat_gcn4]
             
         if pretraining:
-            return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs(non_norm_adj_mI), adv_out, non_norm_adj_mI
+            return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI), adv_out, non_norm_adj_mI
         elif self.calc_bipartite:
             arch_x = self.relu(feat_out)
             arch_x = self.linear2(arch_x)
@@ -568,15 +570,18 @@ class Learnable_Topology_BGNN(nn.Module):
             if self.with_datasets_aux:
                 return feat_out, self.sep_bipartite_graphs(non_norm_adj_mI_after), adv_out, ret_feats #non_norm_adj_mI_after
             else:
-                return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs(non_norm_adj_mI_after), adv_out, ret_feats # non_norm_adj_mI_after
+                return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI_after), adv_out, ret_feats # non_norm_adj_mI_after
         else:
             if self.with_datasets_aux:
                 return feat_out, self.sep_bipartite_graphs(non_norm_adj_mI), adv_out, ret_feats # non_norm_adj_mI
             else:
-                return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs(non_norm_adj_mI), adv_out, ret_feats #, non_norm_adj_mI
+                return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI), adv_out, ret_feats #, non_norm_adj_mI
 
     def init_weight(self):
         pass
+
+    def set_init_stage(self, new_init_stage):
+        self.init_stage = new_init_stage
 
     def sep_bipartite_graphs(self, adj):
         self.bipartite_graphs = []
@@ -599,7 +604,7 @@ class Learnable_Topology_BGNN(nn.Module):
             
             
         for i in range(0, self.n_datasets):
-            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i]+1, self.total_cats+self.n_datasets:]
+            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i], self.total_cats:]
 
             # if self.GumbelSoftmax:
             #     F.gumbel_softmax(logits, tau=1, hard=False, eps=1e-20, dim=-1)
@@ -634,7 +639,7 @@ class Learnable_Topology_BGNN(nn.Module):
                 # self.bipartite_graphs.append(max_bipartite_graph)
                 self.bipartite_graphs.append(this_bipartite_graph)
             
-            cur_cat += self.dataset_cats[i]+1
+            cur_cat += self.dataset_cats[i]
 
         return self.bipartite_graphs
 
@@ -656,10 +661,10 @@ class Learnable_Topology_BGNN(nn.Module):
         self.bipartite_graphs = []
         cur_cat = 0
         for i in range(0, self.n_datasets):
-            this_bigraph = torch.zeros(self.dataset_cats[i]+1, self.num_unify_class)
-            for j in range(0, self.dataset_cats[i]+1):
+            this_bigraph = torch.zeros(self.dataset_cats[i], self.num_unify_class)
+            for j in range(0, self.dataset_cats[i]):
                 this_bigraph[j][cur_cat+j] = 1
-            cur_cat += self.dataset_cats[i]+1
+            cur_cat += self.dataset_cats[i]
             
             if is_cuda:
                 this_bigraph = this_bigraph.cuda()
@@ -687,7 +692,7 @@ class Learnable_Topology_BGNN(nn.Module):
         else:
             out_adj = []
             for i in range(0, self.n_datasets):
-                this_bipartite_graph = adj_mI[cur_cat:cur_cat+self.dataset_cats[i]+1, :]
+                this_bipartite_graph = adj_mI[cur_cat:cur_cat+self.dataset_cats[i], :]
 
                 softmax_bipartite_graph = F.softmax(this_bipartite_graph/0.07, dim=0)
                 # if self.GumbelSoftmax:
@@ -697,11 +702,11 @@ class Learnable_Topology_BGNN(nn.Module):
                 #     softmax_bipartite_graph = F.gumbel_softmax(softmax_bipartite_graph, tau=this_tau, hard=False, eps=1e-20, dim=0)
                     
                 out_adj.append(softmax_bipartite_graph)
-                cur_cat = cur_cat+self.dataset_cats[i]+1
+                cur_cat = cur_cat+self.dataset_cats[i]
             out_adj = torch.cat(out_adj, dim=0)
         
         
-        mask = torch.zeros(self.total_cats+self.n_datasets, self.total_cats+self.n_datasets, requires_grad=True)
+        mask = torch.zeros(self.total_cats, self.total_cats, requires_grad=True)
         mask2 = torch.zeros(self.num_unify_class, self.num_unify_class, requires_grad=True)
         if adj_mI.is_cuda:
             mask = mask.cuda()
@@ -759,29 +764,29 @@ class Learnable_Topology_BGNN(nn.Module):
                 if self.with_datasets_aux:
                     return feat_out, self.sep_bipartite_graphs_by_uot(non_norm_adj_mI_after)
                 else:
-                    return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs_by_uot(non_norm_adj_mI_after)
+                    return feat_out[self.total_cats:], self.sep_bipartite_graphs_by_uot(non_norm_adj_mI_after)
             elif self.init_stage:
                 if self.with_datasets_aux:
                     return feat_out, self.sep_bipartite_graphs(non_norm_adj_mI)
                 else:
-                    return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs(non_norm_adj_mI)
+                    return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI)
             else:
                 if self.GumbelSoftmax:
                     self.GumbelSoftmax = False
                     _, non_norm_adj_mI = self.calc_adjacency_matrix(feat1)
                     self.GumbelSoftmax = True
                                 
-                # return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs(non_norm_adj_mI)
+                # return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI)
                 if self.with_datasets_aux:
                     return feat_out, self.sep_bipartite_graphs_by_uot(non_norm_adj_mI)
                 else:
-                    return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs_by_uot(non_norm_adj_mI)
-                # return feat_out[self.total_cats+self.n_datasets:], self.sep_bipartite_graphs_by_km(non_norm_adj_mI)
+                    return feat_out[self.total_cats:], self.sep_bipartite_graphs_by_uot(non_norm_adj_mI)
+                # return feat_out[self.total_cats:], self.sep_bipartite_graphs_by_km(non_norm_adj_mI)
         else:
             if self.with_datasets_aux:
                 return feat_out, self.pretrain_bipartite_graphs(x.is_cuda)
             else:
-                return feat_out[self.total_cats+self.n_datasets:], self.pretrain_bipartite_graphs(x.is_cuda)
+                return feat_out[self.total_cats:], self.pretrain_bipartite_graphs(x.is_cuda)
 
     def np_gumbel_softmax_decay(self, current_iter, r, max_temp, min_temp):
         """
@@ -800,7 +805,7 @@ class Learnable_Topology_BGNN(nn.Module):
         self.bipartite_graphs = []
         cur_cat = 0
         for i in range(0, self.n_datasets):
-            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i]+1, self.total_cats+self.n_datasets:]
+            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i], self.total_cats:]
             this_bipartite_graph = this_bipartite_graph.detach()
             if self.use_km:
                 indexes = self.km_algorithms.compute(-this_bipartite_graph.cpu().numpy())
@@ -833,7 +838,7 @@ class Learnable_Topology_BGNN(nn.Module):
 
             self.bipartite_graphs.append(out_bipartite_graphs) 
                 
-            cur_cat += self.dataset_cats[i]+1
+            cur_cat += self.dataset_cats[i]
         
         return self.bipartite_graphs 
     
@@ -841,7 +846,7 @@ class Learnable_Topology_BGNN(nn.Module):
         bipartite_graphs = []
         cur_cat = 0
         for i in range(0, self.n_datasets):
-            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i]+1, self.total_cats+self.n_datasets:]
+            this_bipartite_graph = adj[cur_cat:cur_cat+self.dataset_cats[i], self.total_cats:]
             this_bipartite_graph = (-this_bipartite_graph.detach().clone()+1 + 1e-8)/2
             out_bipartite_graphs = torch.zeros_like(this_bipartite_graph)
 
@@ -870,7 +875,7 @@ class Learnable_Topology_BGNN(nn.Module):
             for col, index in enumerate(pseudo_label):
                 out_bipartite_graphs[index, col] = 1
 
-            for row in range(0, self.dataset_cats[i]+1):
+            for row in range(0, self.dataset_cats[i]):
                 if torch.sum(out_bipartite_graphs[row]) == 0:
                     # print(f'find miss one in UOT, datasets:{i}, row:{row}')
                     sorted_tensor, indices = torch.sort(Q_st_bar.T[row])
@@ -899,7 +904,7 @@ class Learnable_Topology_BGNN(nn.Module):
                         print("error don't find correct one")
                     
                     
-            for row in range(0, self.dataset_cats[i]+1):
+            for row in range(0, self.dataset_cats[i]):
                 if torch.sum(out_bipartite_graphs[row]) > 1:
                     max_v, max_i = 0, 0
                     for index, val in enumerate(out_bipartite_graphs[row]):
@@ -923,7 +928,7 @@ class Learnable_Topology_BGNN(nn.Module):
             # print(torch.max(out_bipartite_graphs, dim=1))
             bipartite_graphs.append(out_bipartite_graphs) 
                 
-            cur_cat += self.dataset_cats[i]+1
+            cur_cat += self.dataset_cats[i]
         
         # temp_bipartite_graphs = torch.cat(self.bipartite_graphs, dim=0)
         # unique_cols, unique_indices = torch.unique(temp_bipartite_graphs, sorted=False, dim=1, return_inverse=True)

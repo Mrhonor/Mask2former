@@ -152,15 +152,16 @@ class HRNet_W48(nn.Module):
         cur_cat = 0 
         for i in range(0, self.n_datasets):
             this_bigraph = torch.zeros(self.datasets_cats[i], self.num_unify_class)
-            for j in range(0, self.datasets_cats[i]):
-                this_bigraph[j, cur_cat+j] = 1
+            if self.num_unify_class == self.total_cats:
+                for j in range(0, self.datasets_cats[i]):
+                    this_bigraph[j, cur_cat+j] = 1
             cur_cat += self.datasets_cats[i]
             self.bipartite_graphs.append(nn.Parameter(
                 this_bigraph, requires_grad=False
                 ))
             
 
-        self.unify_prototype = nn.Parameter(torch.zeros(self.num_unify_class, self.output_feat_dim),
+        self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
                                 requires_grad=False)
         trunc_normal_(self.unify_prototype, std=0.02)
         
@@ -173,7 +174,9 @@ class HRNet_W48(nn.Module):
                 trunc_normal_(self.aux_prototype[i], std=0.02)
 
         self.init_weights()    
-        self.get_encode_lb_vec()
+        if self.num_unify_class == self.total_cats:
+            self.get_encode_lb_vec()
+        
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -182,7 +185,7 @@ class HRNet_W48(nn.Module):
         num_unify_class = cfg.DATASETS.NUM_UNIFY_CLASS
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         output_feat_dim = cfg.MODEL.SEM_SEG_HEAD.OUTPUT_FEAT_DIM
-        with_datasets_aux = cfg.MODEL.SEM_SEG_HEAD.WITH_DATASETS_AUX
+        with_datasets_aux = cfg.MODEL.GNN.with_datasets_aux
         bn_type = cfg.MODEL.SEM_SEG_HEAD.BN_TYPE
         configer = Configer(configs=cfg.DATASETS.CONFIGER)
         return {
@@ -231,7 +234,14 @@ class HRNet_W48(nn.Module):
             return {'logits':remap_logits, 'emb':emb}
         else:
             logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype) 
-            remap_logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset_ids])
+            if not isinstance(dataset_ids, int):
+                remap_logits = []
+                for i in range(self.n_datasets):
+                    if not (dataset_ids == i).any():
+                        continue
+                    remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
+            else:
+                remap_logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset_ids])
             return {'logits':remap_logits, 'emb':emb}
 
     # return {'logits': emb}
@@ -377,7 +387,8 @@ class HRNet_W48(nn.Module):
             
         
     def set_unify_prototype(self, unify_prototype, grad=False):
-        if self.with_datasets_aux and unify_prototype.shape[0] != self.unify_prototype.shape[0]:
+        
+        if unify_prototype.shape[0] != self.unify_prototype.shape[0]:
             self.unify_prototype.data = unify_prototype[self.total_cats:]
             self.unify_prototype.requires_grad=grad
             cur_cat = 0
