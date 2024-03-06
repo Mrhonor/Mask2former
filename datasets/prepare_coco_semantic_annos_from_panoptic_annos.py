@@ -59,8 +59,8 @@ def separate_coco_semantic_from_panoptic(panoptic_json, panoptic_root, sem_seg_r
         for anno in obj["annotations"]:
             file_name = anno["file_name"]
             segments = anno["segments_info"]
-            input = os.path.join(panoptic_root, file_name)
-            output = os.path.join(sem_seg_root, file_name)
+            input = os.path.join(panoptic_root, file_name).replace('png', 'jpg')
+            output = os.path.join(sem_seg_root, file_name) #.replace('png', 'jpg')
             yield input, output, segments
 
     print("Start writing to {} ...".format(sem_seg_root))
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     for s in ["val2017", "train2017"]:
         separate_coco_semantic_from_panoptic(
             os.path.join(dataset_dir, "annotations/panoptic_{}.json".format(s)),
-            os.path.join(dataset_dir, "panoptic_{}".format(s)),
+            os.path.join(dataset_dir, "images/{}".format(s)),
             os.path.join(dataset_dir, "panoptic_semseg_{}".format(s)),
             COCO_CATEGORIES,
         )

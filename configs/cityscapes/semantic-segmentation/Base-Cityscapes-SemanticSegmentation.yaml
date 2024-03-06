@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "build_resnet_backbone"
-  WEIGHTS: "detectron2://ImageNetPretrained/torchvision/R-50.pkl"
+  WEIGHTS: "output/model_0004999.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   RESNETS:
@@ -11,15 +11,15 @@ MODEL:
     STEM_OUT_CHANNELS: 64
     STRIDE_IN_1X1: False
     OUT_FEATURES: ["res2", "res3", "res4", "res5"]
-    NORM: "SyncBN"  # use syncbn for cityscapes dataset
+    NORM: "BN"  # use syncbn for cityscapes dataset
     RES5_MULTI_GRID: [1, 1, 1]  # not used
 DATASETS:
   TRAIN: ("cityscapes_fine_sem_seg_train",)
-  TEST: ("cityscapes_fine_sem_seg_val",)
+  TEST: ("cs_sem_seg_val",)
 SOLVER:
-  IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 2
   BASE_LR: 0.0001
-  MAX_ITER: 90000
+  MAX_ITER: 10000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 0
   WEIGHT_DECAY: 0.05
@@ -42,7 +42,7 @@ INPUT:
   CROP:
     ENABLED: True
     TYPE: "absolute"
-    SIZE: (512, 1024)
+    SIZE: (768, 768)
     SINGLE_CATEGORY_MAX_AREA: 1.0
   COLOR_AUG_SSD: True
   SIZE_DIVISIBILITY: -1
