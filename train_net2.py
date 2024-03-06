@@ -45,6 +45,7 @@ from detectron2.evaluation import (
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
+from detectron2.engine.hooks import HookBase
 
 # MaskFormer
 from mask2former import (
@@ -76,6 +77,10 @@ def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None):
         array = lb_map[array]
     return array
     
+class eval_link_hook(HookBase):
+    def after_step(self):
+        if self.trainer.iter % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN:
+            print(f"Hello at iteration {self.trainer.iter}!")
 
 class Trainer(DefaultTrainer):
     """
@@ -367,6 +372,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
+    trainer.register_hooks([eval_link_hook])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

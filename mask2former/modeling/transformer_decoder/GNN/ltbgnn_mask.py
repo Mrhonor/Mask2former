@@ -365,7 +365,6 @@ class Learnable_Topology_BGNN_adj_tg(nn.Module):
                 dataset_cats,
                 num_unify_class,
                 isGumbelSoftmax,
-                graph_node_features
                  ):
         """Dense version of GAT."""
         super(Learnable_Topology_BGNN_adj_tg, self).__init__()
