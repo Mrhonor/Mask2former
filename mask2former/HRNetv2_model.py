@@ -108,6 +108,7 @@ class HRNet_W48_ARCH(nn.Module):
         first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
         num_unify_classes = cfg.DATASETS.NUM_UNIFY_CLASS
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
+        loss_weight_dict = cfg.LOSS.LOSS_WEIGHT_DICT
         
         return {
             'backbone': backbone,
@@ -127,7 +128,8 @@ class HRNet_W48_ARCH(nn.Module):
             "seg_iters": seg_iters,
             "first_stage_gnn_iters": first_stage_gnn_iters,
             "num_unify_classes": num_unify_classes,
-            "with_spa_loss": with_spa_loss
+            "with_spa_loss": with_spa_loss,
+            "loss_weight_dict": loss_weight_dict
         }
 
 
@@ -257,6 +259,10 @@ class HRNet_W48_ARCH(nn.Module):
                         spa_loss =  torch.pow(torch.norm(bi_graphs[i], p='fro'), 2)
                     
                     losses[f'loss_spa'] = spa_loss
+                for k in list(losses.keys()):
+                    if k in self.loss_weight_dict:
+                        losses[k] *= self.loss_weight_dict[k]
+                return losses
             else:
                 self.backbone.eval()
                 self.proj_head.eval()

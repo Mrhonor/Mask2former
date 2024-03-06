@@ -199,4 +199,5 @@ def add_gnn_config(cfg):
     
     
     cfg.LOSS.WITH_SPA_LOSS = True
+    cfg.LOSS.LOSS_WEIGHT_DICT = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 1, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 1, "loss_aux6": 1, "loss_spa": 0.1}
     
