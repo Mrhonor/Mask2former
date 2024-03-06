@@ -372,7 +372,7 @@ class MulBNBlock(nn.Module):
     #                                  error_msgs)
 
 @BACKBONE_REGISTRY.register()
-class SnpResNet(nn.Module):
+class SnpResNet(Backbone):
     def _make_layer(self, block, planes, blocks, stride=1, bn_class=nn.BatchNorm2d):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -391,7 +391,7 @@ class SnpResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, input_shape):
         block=BasicBlock
         layers=[2, 2, 2, 2]
         num_features=128 

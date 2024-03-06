@@ -99,10 +99,9 @@ def register_idd():
 register_idd()
 
 train_annpath = f'mask2former/datasets/IDD/train.txt'
-def idd_train():
-    # assert mode in ('train', 'eval', 'test')
+def IDD_train(anp):
 
-    with open(train_annpath, 'r') as fr:
+    with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
     img_paths, lb_paths = [], []
     for pair in pairs:
@@ -121,27 +120,29 @@ def idd_train():
     return dataset_dicts
 
 
-def register_idd_train():
+def register_IDD_train():
     
     
-    # meta = _get_ade20k_full_meta()
+    # meta = _get_cs20k_full_meta()
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
+        name = f"idd_sem_seg_{n}"
+        annpath = f'mask2former/datasets/IDD/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : IDD_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["road", "drivable fallback or parking", "sidewalk", "non-drivable fallback or rail track", "person or animal", "out of roi or rider", "motorcycle", "bicycle", "autorickshaw", "car", "truck", "bus", "trailer or caravan or vehicle fallback", "curb", "wall", "fence", "guard rail", "billboard", "traffic sign", "traffic light", "polegroup or pole", "obs-str-bar-fallback", "building", "tunnel or bridge", "vegetation", "sky or fallback background"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+        )
 
-    name = f"idd_sem_seg_train"
-    DatasetCatalog.register(
-        name, idd_train
-    )
-    
-    MetadataCatalog.get(name).set(
-        stuff_classes=["road", "drivable fallback or parking", "sidewalk", "non-drivable fallback or rail track", "person or animal", "out of roi or rider", "motorcycle", "bicycle", "autorickshaw", "car", "truck", "bus", "trailer or caravan or vehicle fallback", "curb", "wall", "fence", "guard rail", "billboard", "traffic sign", "traffic light", "polegroup or pole", "obs-str-bar-fallback", "building", "tunnel or bridge", "vegetation", "sky or fallback background"],
-        stuff_dataset_id_to_contiguous_id=lb_map,
-        thing_dataset_id_to_contiguous_id=lb_map,
-        evaluator_type="sem_seg",
-        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
-    )
+register_IDD_train()
 
-register_idd_train()

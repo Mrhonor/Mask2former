@@ -193,10 +193,9 @@ def register_coco():
 register_coco()
 
 train_annpath = f'mask2former/datasets/coco/train.txt'
-def coco_train():
-    # assert mode in ('train', 'eval', 'test')
+def coco_train(anp):
 
-    with open(train_annpath, 'r') as fr:
+    with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
     img_paths, lb_paths = [], []
     for pair in pairs:
@@ -218,24 +217,25 @@ def coco_train():
 def register_coco_train():
     
     
-    # meta = _get_ade20k_full_meta()
+    # meta = _get_cs20k_full_meta()
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
-
-    name = f"coco_sem_seg_train"
-    DatasetCatalog.register(
-        name, coco_train
-    )
-    
-    MetadataCatalog.get(name).set(
-        stuff_classes=["rug-merged", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"],
-        stuff_dataset_id_to_contiguous_id=lb_map,
-        thing_dataset_id_to_contiguous_id=lb_map,
-        evaluator_type="sem_seg",
-        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
-    )
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
+        name = f"coco_sem_seg_{n}"
+        annpath = f'mask2former/datasets/coco/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : coco_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["rug-merged", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+        )
 
 register_coco_train()

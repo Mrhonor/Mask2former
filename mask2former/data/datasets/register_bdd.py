@@ -81,10 +81,10 @@ register_bdd()
 
 
 train_annpath = f'mask2former/datasets/bdd100k/train.txt'
-def bdd_train():
-    # assert mode in ('train', 'eval', 'test')
 
-    with open(train_annpath, 'r') as fr:
+def bdd_train(anp):
+
+    with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
     img_paths, lb_paths = [], []
     for pair in pairs:
@@ -106,24 +106,25 @@ def bdd_train():
 def register_bdd_train():
     
     
-    # meta = _get_ade20k_full_meta()
+    # meta = _get_bdd20k_full_meta()
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
+        name = f"bdd_sem_seg_{n}"
+        annpath = f'mask2former/datasets/bdd100k/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : bdd_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+        )
 
-    name = f"bdd_sem_seg_train"
-    DatasetCatalog.register(
-        name, bdd_train
-    )
-    
-    MetadataCatalog.get(name).set(
-        stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
-        thing_dataset_id_to_contiguous_id=lb_map,
-        evaluator_type="sem_seg",
-        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
-    )
-
-    
 register_bdd_train()

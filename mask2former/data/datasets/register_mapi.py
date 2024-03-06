@@ -126,10 +126,10 @@ def register_mapi():
 register_mapi()
 
 train_annpath = f'mask2former/datasets/mapi/training.txt'
-def mapi_train():
+def mapi_train(anp):
     # assert mode in ('train', 'eval', 'test')
 
-    with open(train_annpath, 'r') as fr:
+    with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
     img_paths, lb_paths = [], []
     for pair in pairs:
@@ -157,18 +157,21 @@ def register_mapi_train():
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
+    for n, anp in [("train", "training"), ("train_1", "training_1"), ("train_2", "training_2")]:
+        name = f"mapi_sem_seg_{n}"
+        annpath = f'mask2former/datasets/mapi/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : mapi_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["Bird", "Ground Animal", "Curb", "Fence", "Guard Rail", "Barrier", "Wall", "Bike Lane", "Crosswalk - Plain", "Curb Cut", "Parking", "Pedestrian Area", "Rail Track", "Road", "Service Lane", "Sidewalk", "Bridge", "Building", "Tunnel", "Person", "Bicyclist", "Motorcyclist", "Other Rider", "Lane Marking - Crosswalk", "Lane Marking - General", "Mountain", "Sand", "Sky", "Snow", "Terrain", "Vegetation", "Water", "Banner", "Bench", "Bike Rack", "Billboard", "Catch Basin", "CCTV Camera", "Fire Hydrant", "Junction Box", "Manhole", "Phone Booth", "Pothole", "Street Light", "Pole", "Traffic Sign Frame", "Utility Pole", "Traffic Light", "Traffic Sign (Back)", "Traffic Sign (Front)", "Trash Can", "Bicycle", "Boat", "Bus", "Car", "Caravan", "Motorcycle", "On Rails", "Other Vehicle", "Trailer", "Truck", "Wheeled Slow", "Car Mount", "Ego Vehicle"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+        )
 
-    name = f"mapi_sem_seg_train"
-    DatasetCatalog.register(
-        name, mapi_train
-    )
-    
-    MetadataCatalog.get(name).set(
-        stuff_classes=["Bird", "Ground Animal", "Curb", "Fence", "Guard Rail", "Barrier", "Wall", "Bike Lane", "Crosswalk - Plain", "Curb Cut", "Parking", "Pedestrian Area", "Rail Track", "Road", "Service Lane", "Sidewalk", "Bridge", "Building", "Tunnel", "Person", "Bicyclist", "Motorcyclist", "Other Rider", "Lane Marking - Crosswalk", "Lane Marking - General", "Mountain", "Sand", "Sky", "Snow", "Terrain", "Vegetation", "Water", "Banner", "Bench", "Bike Rack", "Billboard", "Catch Basin", "CCTV Camera", "Fire Hydrant", "Junction Box", "Manhole", "Phone Booth", "Pothole", "Street Light", "Pole", "Traffic Sign Frame", "Utility Pole", "Traffic Light", "Traffic Sign (Back)", "Traffic Sign (Front)", "Trash Can", "Bicycle", "Boat", "Bus", "Car", "Caravan", "Motorcycle", "On Rails", "Other Vehicle", "Trailer", "Truck", "Wheeled Slow", "Car Mount", "Ego Vehicle"],
-        stuff_dataset_id_to_contiguous_id=lb_map,
-        thing_dataset_id_to_contiguous_id=lb_map,
-        evaluator_type="sem_seg",
-        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
-    )
+
 
 register_mapi_train()

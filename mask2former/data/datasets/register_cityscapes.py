@@ -95,10 +95,9 @@ def register_cs():
 register_cs()
 
 train_annpath = f'mask2former/datasets/Cityscapes/train.txt'
-def cs_train():
-    # assert mode in ('train', 'eval', 'test')
+def cs_train(anp):
 
-    with open(train_annpath, 'r') as fr:
+    with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
     img_paths, lb_paths = [], []
     for pair in pairs:
@@ -120,24 +119,26 @@ def cs_train():
 def register_cs_train():
     
     
-    # meta = _get_ade20k_full_meta()
+    # meta = _get_cs20k_full_meta()
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
-
-    name = f"cs_sem_seg_train"
-    DatasetCatalog.register(
-        name, cs_train
-    )
-    
-    MetadataCatalog.get(name).set(
-        stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
-        thing_dataset_id_to_contiguous_id=lb_map,
-        stuff_dataset_id_to_contiguous_id=lb_map,
-        evaluator_type="sem_seg",
-        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
-    )
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
+        name = f"cs_sem_seg_{n}"
+        annpath = f'mask2former/datasets/Cityscapes/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : cs_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+        )
 
 register_cs_train()
+

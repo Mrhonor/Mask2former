@@ -17,6 +17,7 @@ import clip
 import logging
 from detectron2.utils.events import get_event_storage, EventStorage
 import numpy as np
+import torch.utils.model_zoo as model_zoo
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ class HRNet_W48_ARCH(nn.Module):
                 seg_iters,
                 first_stage_gnn_iters,
                 num_unify_classes,
-                with_spa_loss
+                with_spa_loss,
+                loss_weight_dict
                 ):
         super(HRNet_W48_ARCH, self).__init__()
         self.num_unify_classes = num_unify_classes
@@ -72,7 +74,7 @@ class HRNet_W48_ARCH(nn.Module):
         self.with_datasets_aux = with_datasets_aux
         assert self.first_stage_gnn_iters < self.gnn_iters, "first_stage_gnn_iters must less than gnn_iters"
         self.proj_head = sem_seg_head # ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
-        self.graph_node_features = graph_node_features.cuda()
+        self.graph_node_features = graph_node_features #.cuda()
         self.total_cats = 0
         # self.datasets_cats = []
         for i in range(0, self.n_datasets):
@@ -91,12 +93,18 @@ class HRNet_W48_ARCH(nn.Module):
         self.isLoad = False
         self.with_spa_loss = with_spa_loss
 
+        self.loss_weight_dict = loss_weight_dict
+    
+        self.backbone.load_state_dict( model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth"), strict=False)
+  
+
         # self.get_encode_lb_vec()
 
     @classmethod
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
-        sem_seg_head = build_sem_seg_head(cfg, 720)
+        # sem_seg_head = build_sem_seg_head(cfg, 720)
+        sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
         gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
@@ -111,7 +119,7 @@ class HRNet_W48_ARCH(nn.Module):
         first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
         num_unify_classes = cfg.DATASETS.NUM_UNIFY_CLASS
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
-        loss_weight_dict = cfg.LOSS.LOSS_WEIGHT_DICT
+        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 1, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 1, "loss_aux6": 1, "loss_spa": 0.1}
         
         return {
             'backbone': backbone,

@@ -6,9 +6,13 @@ import warnings
 import numpy as np
 import clip
 
+from ...utils.configer import Configer
+
 from timm.models.layers import trunc_normal_
 from detectron2.config import configurable
 from detectron2.modeling import SEM_SEG_HEADS_REGISTRY
+import logging
+logger = logging.getLogger(__name__)
 
 upsample = lambda x, size: F.interpolate(x, size, mode='bilinear', align_corners=False)
 
@@ -111,7 +115,7 @@ class SemsegModel(nn.Module):
         
         multiscale_factors=(.5, .75, 1.5, 2.)
         
-        self.configer = configer
+        self.configer = Configer(configs=cfg.DATASETS.CONFIGER)
         self.aux_mode = cfg.MODEL.AUX_MODE
         self.datasets_cats = cfg.DATASETS.DATASETS_CATS
         self.n_datasets = len(self.datasets_cats)
@@ -123,7 +127,8 @@ class SemsegModel(nn.Module):
         self.output_feat_dim = cfg.MODEL.SEM_SEG_HEAD.OUTPUT_FEAT_DIM
         self.num_unify_class = cfg.DATASETS.NUM_UNIFY_CLASS
 
-        self.logits = logit_class(self.backbone.num_features, self.output_feat_dim, batch_norm=use_bn, k=k, bias=bias) 
+        # self.logits = logit_class(self.backbone.num_features, self.output_feat_dim, batch_norm=use_bn, k=k, bias=bias) 
+        self.logits = logit_class(input_shape, self.output_feat_dim, batch_norm=use_bn, k=k, bias=bias) 
         self.bipartite_graphs = nn.ParameterList([])
         cur_cat = 0 
         for i in range(0, self.n_datasets):
@@ -163,7 +168,8 @@ class SemsegModel(nn.Module):
         self.multiscale_factors = multiscale_factors
 
     def forward(self, features, dataset_ids=0):
-        emb = self.logits.forward(features)
+        feat, _ = features
+        emb = self.logits.forward(feat)
         if self.training:
             logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
             remap_logits = []
@@ -197,11 +203,11 @@ class SemsegModel(nn.Module):
     def get_encode_lb_vec(self):
         text_feature_vecs = []
         with torch.no_grad():
-            clip_model, _ = clip.load("ViT-B/32", device="cuda")
+            clip_model, _ = clip.load("ViT-B/32", device="cpu")
             for i in range(0, self.n_datasets):
                 lb_name = self.configer.get("dataset"+str(i+1), "label_names")
                 lb_name = [f'a photo of {name} from dataset {i+1}.' for name in lb_name]
-                text = clip.tokenize(lb_name).cuda()
+                text = clip.tokenize(lb_name) #.cuda()
                 text_features = clip_model.encode_text(text).type(torch.float32)
                 text_feature_vecs.append(text_features)
                 

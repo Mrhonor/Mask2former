@@ -80,6 +80,7 @@ def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None):
 class eval_link_hook(HookBase):
     def after_step(self):
         if self.trainer.iter % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN:
+            
             print(f"Hello at iteration {self.trainer.iter}!")
 
 class Trainer(DefaultTrainer):
@@ -372,7 +373,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    trainer.register_hooks([eval_link_hook])
+    trainer.register_hooks([eval_link_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 
