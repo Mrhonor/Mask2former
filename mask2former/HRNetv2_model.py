@@ -80,6 +80,7 @@ class HRNet_W48_ARCH(nn.Module):
         assert self.first_stage_gnn_iters < self.gnn_iters, "first_stage_gnn_iters must less than gnn_iters"
         self.proj_head = sem_seg_head # ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
         self.graph_node_features = graph_node_features.cuda()
+        self.iters = 0
         self.total_cats = 0
         # self.datasets_cats = []
         for i in range(0, self.n_datasets):
@@ -103,6 +104,7 @@ class HRNet_W48_ARCH(nn.Module):
 
         self.loss_weight_dict = loss_weight_dict
         self.MSE_sum_loss = torch.nn.MSELoss(reduction='sum')
+        self.init_gnn_stage = False
     
         # self.backbone.load_state_dict( model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth"), strict=False)
   
@@ -172,13 +174,6 @@ class HRNet_W48_ARCH(nn.Module):
         #     features = self.backbone(images)  
         # else:
 
-            
-        iters = 0
-        with EventStorage():
-            storage = get_event_storage()
-            iters = storage.iter
-
-
         
         images = [x["image"].cuda() for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
@@ -222,7 +217,7 @@ class HRNet_W48_ARCH(nn.Module):
                 processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
                 return processed_results
         else:
-            self.env_init(iters)
+            self.env_init(self.iters)
     
             if self.training:
 
@@ -285,16 +280,19 @@ class HRNet_W48_ARCH(nn.Module):
                         aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                         aux_loss = self.criterion(aux_logits, targets[dataset_lbs==i])
                         losses[f'loss_aux{i}'] = aux_loss
+                    
+
+                    
                 
-                    if self.with_spa_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and iters > self.init_gnn_iters:
+                    if self.with_spa_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and self.iters > self.init_gnn_iters:
                         if len(bi_graphs)==2*self.n_datasets:
                             spa_loss = torch.pow(torch.norm(bi_graphs[2*i+1], p='fro'), 2)
                         else:
                             spa_loss =  torch.pow(torch.norm(bi_graphs[i], p='fro'), 2)
                         
-                        losses[f'loss_spa'] = spa_loss
+                        losses['loss_spa'] = spa_loss
                         
-                    if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and iters > self.init_gnn_iters and self.target_bipart is not None:
+                    if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and self.iters > self.init_gnn_iters and self.target_bipart is not None:
                         if len(bi_graphs) == 2*self.n_datasets:
                             total_num = bi_graphs[2*i+1].shape[0] * bi_graphs[2*i+1].shape[1]
                             base_weight = 1 / total_num
@@ -319,8 +317,6 @@ class HRNet_W48_ARCH(nn.Module):
                         losses['loss_orth'] = self.similarity_dsb(unify_prototype[self.total_cats:])
                     else:
                         losses['loss_orth'] = self.similarity_dsb(unify_prototype)
-
-                        
                     
                 for k in list(losses.keys()):
                     if k in self.loss_weight_dict:
@@ -347,6 +343,7 @@ class HRNet_W48_ARCH(nn.Module):
                     else:
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[dataset_lbs])
                     logits = F.interpolate(logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+
                     processed_results = [{"sem_seg": logits[i], "uni_logits": ori_logits[i]} for i in range(logits.shape[0])]
                 return processed_results                
 
@@ -361,8 +358,10 @@ class HRNet_W48_ARCH(nn.Module):
                 self.proj_head.eval()
                 self.gnn_model.train()
                 if iters < self.init_gnn_iters:
+                    logger.info(f"init gnn stage")
                     self.gnn_model.frozenAdj(True)
                     self.gnn_model.set_init_stage(True)
+                    self.init_gnn_stage = True
                 else:
                     self.gnn_model.set_init_stage(False)
             else:
@@ -376,36 +375,47 @@ class HRNet_W48_ARCH(nn.Module):
             self.initial = True
 
         if self.train_seg_or_gnn == self.GNN:
-            if self.inFirstGNNStage and int(self.alter_iters) > self.first_stage_gnn_iters:
+            if self.init_gnn_stage and iters > self.init_gnn_iters:
+                logger.info(f"finish init gnn stage")
+                self.change_to_seg()
+                self.init_gnn_stage = False
+                
+            elif self.inFirstGNNStage and int(self.alter_iters) > self.first_stage_gnn_iters:
                 logger.info(f"change to second_gnn_stage")
                 self.gnn_model.frozenAdj(True)
                 self.inFirstGNNStage = False
             if int(self.alter_iters) > self.gnn_iters:
-                logger.info(f"change to seg_stage")
-                self.train_seg_or_gnn = self.SEG
-                self.backbone.req_grad(True)
-                self.proj_head.req_grad(True)
-                self.gnn_model.req_grad(False)
-                self.backbone.train()
-                self.proj_head.train()
-                self.gnn_model.eval() 
-                self.alter_iters = torch.zeros(1)
+                self.change_to_seg()
         else:
             if int(self.alter_iters) > self.seg_iters:
-                logger.info(f"change to gnn_stage")
-                self.train_seg_or_gnn = self.GNN
-                self.backbone.req_grad(False)
-                self.proj_head.req_grad(False)
-                self.gnn_model.req_grad(True)
-                self.backbone.eval()
-                self.proj_head.eval()
-                self.gnn_model.train()
-                self.alter_iters = torch.zeros(1)
+                self.change_to_gnn()
                 unify_prototype, bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
                 self.proj_head.set_bipartite_graphs(bi_graphs)
                 self.proj_head.set_unify_prototype(unify_prototype, grad=True)
                     
                 self.inFirstGNNStage = True
+
+    def change_to_seg(self):
+        logger.info(f"change to seg_stage")
+        self.train_seg_or_gnn = self.SEG
+        self.backbone.req_grad(True)
+        self.proj_head.req_grad(True)
+        self.gnn_model.req_grad(False)
+        self.backbone.train()
+        self.proj_head.train()
+        self.gnn_model.eval() 
+        self.alter_iters = torch.zeros(1)
+
+    def change_to_gnn(self):
+        logger.info(f"change to gnn_stage")
+        self.train_seg_or_gnn = self.GNN
+        self.backbone.req_grad(False)
+        self.proj_head.req_grad(False)
+        self.gnn_model.req_grad(True)
+        self.backbone.eval()
+        self.proj_head.eval()
+        self.gnn_model.train()
+        self.alter_iters = torch.zeros(1)
                 
                     
 

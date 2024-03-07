@@ -226,7 +226,7 @@ class HRNet_W48(nn.Module):
                 cur_cat = 0
                 aux_logits = []
                 for i in range(self.n_datasets):
-                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb, self.aux_prototype[i]))
+                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb[dataset_ids==i], self.aux_prototype[i]))
                     cur_cat += self.datasets_cats[i]
                     
                 return {'logits':remap_logits, 'aux_logits':aux_logits, 'emb':emb}

@@ -912,6 +912,8 @@ class LoaderAdapter:
     def __init__(self, cfg, aux_mode='train', dataset_id=None) -> None:
         if aux_mode == 'train':
             self.datasets_name = cfg.DATASETS.TRAIN
+        elif aux_mode == 'eval':
+            self.datasets_name = cfg.DATASETS.EVAL
         else:
             self.datasets_name = cfg.DATASETS.TEST
         dataset = [get_detection_dataset_dicts(
@@ -936,14 +938,14 @@ class LoaderAdapter:
         if aux_mode == 'train':
             self.dls = [build_detection_train_loader(cfg, mapper=mp, dataset=ds) for ds, mp in zip(dataset, mapper)]
         else:
-            mapper = SemanticDatasetMapper(cfg, False, 0, False)
-            if dataset_id > 0:
+            mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
+            # if dataset_id > 0:
                 
-                Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
-                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
-            else:
-                Log.info(f"evaluate {self.datasets_name[dataset_id]}")
-                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
+            #     Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
+            #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
+            # else:
+            Log.info(f"evaluate {self.datasets_name[dataset_id]}")
+            self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
         
         # self.configer = Configer(configs=cfg.DATASETS.CONFIGER)
         self.max_iters = cfg.SOLVER.MAX_ITER + 10

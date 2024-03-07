@@ -73,6 +73,7 @@ from detectron2.structures import ImageList
 import torch.nn.functional as F
 import logging
 
+from mask2former.utils.evaluate import eval_link_hook, iter_info_hook
 
 
 def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None, size_divisibility=-1, ignore_label=255):
@@ -241,24 +242,28 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
-        if dataset_name == "cs_sem_seg_val":
+        if 'cs' in dataset_name:
             dataset_id = 0            
-        elif dataset_name == "mapi_sem_seg_val":
+        elif 'mapi' in dataset_name:
             dataset_id = 1
-        elif dataset_name == "sunrgbd_sem_seg_val":
+        elif 'sunrgbd' in dataset_name:
             dataset_id = 2
-        elif dataset_name == "bdd_sem_seg_val":
+        elif 'bdd' in dataset_name:
             dataset_id = 3
-        elif dataset_name == "idd_sem_seg_val":
+        elif 'idd' in dataset_name:
             dataset_id = 4
-        elif dataset_name == "ade_sem_seg_val":
+        elif 'ade' in dataset_name:
             dataset_id = 5
-        elif dataset_name == "coco_sem_seg_val":
+        elif 'coco' in dataset_name:
             dataset_id = 6
         else:
             dataset_id = 0
-
-        return LoaderAdapter(cfg, aux_mode='eval', dataset_id=dataset_id)
+        
+        aux_mode = 'test'
+        if '_2' in dataset_name:
+            aux_mode = 'eval'
+            
+        return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id)
 
     @classmethod
     def build_optimizer(cls, cfg, model):
@@ -393,7 +398,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    # trainer.register_hooks([eval_link_hook()])
+    # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

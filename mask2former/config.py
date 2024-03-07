@@ -155,6 +155,7 @@ def add_hrnet_config(cfg):
     cfg.INPUT.MAX_SCALE = 2.0
 
     cfg.DATASETS.DATASETS_CATS = [19]
+    cfg.DATASETS.EVAL = []
     cfg.DATASETS.IGNORE_LB = 255
     cfg.DATASETS.NUM_UNIFY_CLASS = 19
     cfg.DATASETS.CONFIGER = 'configs/ltbgnn_7_datasets_snp.json'

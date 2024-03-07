@@ -1,4 +1,4 @@
-_BASE_: Base-Cityscapes-SemanticSegmentation_hrnet.yaml
+_BASE_: Base-Cityscapes-SemanticSegmentation_gnn.yaml
 MODEL:
   META_ARCHITECTURE: "HRNet_W48_ARCH"
   PRETRAINING: False
