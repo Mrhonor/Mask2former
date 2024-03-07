@@ -12,8 +12,7 @@ MODEL:
     FULL_RES_STEM: False
     BN_TYPE: "torchbn"  # use syncbn for cityscapes dataset
   AUX_MODE: "train"
-  SIZE_DIVISIBILITY: 32
-  PRETRAINING: True
+  PRETRAINING: False
 DATASETS:
   TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "sunrgbd_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "ade_sem_seg_train", "coco_sem_seg_train")
   TEST: ("cs_sem_seg_val", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
@@ -24,6 +23,8 @@ DATASETS:
 LOSS:
   OHEM_THRESH: 0.7 
   WITH_SPA_LOSS: True
+  WITH_ORTH_LOSS: True
+  WITH_ADJ_LOSS: True
 SOLVER:
   IMS_PER_BATCH: 2
   BASE_LR: 0.0001
@@ -53,7 +54,7 @@ INPUT:
     SIZE: (768, 768)
     SINGLE_CATEGORY_MAX_AREA: 1.0
   COLOR_AUG_SSD: True
-  SIZE_DIVISIBILITY: -1
+  SIZE_DIVISIBILITY: 768
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:

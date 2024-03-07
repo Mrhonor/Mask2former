@@ -46,7 +46,9 @@ class HRNet_W48_ARCH(nn.Module):
                 first_stage_gnn_iters,
                 num_unify_classes,
                 with_spa_loss,
-                loss_weight_dict
+                loss_weight_dict,
+                with_orth_loss,
+                with_adj_loss
                 ):
         super(HRNet_W48_ARCH, self).__init__()
         self.num_unify_classes = num_unify_classes
@@ -62,6 +64,9 @@ class HRNet_W48_ARCH(nn.Module):
         self.register_buffer("train_seg_or_gnn", torch.ones(1), False)
         self.register_buffer("GNN", torch.ones(1), False)
         self.register_buffer("SEG", torch.zeros(1), False)
+        # self.register_buffer("target_bipart", torch.ParameterList([]), False)
+        target_bipart = None
+        
         #self.GNN = torch.ones(1)
         #self.SEG = torch.zeros(1)
         self.init_gnn_iters = init_gnn_iters
@@ -74,7 +79,7 @@ class HRNet_W48_ARCH(nn.Module):
         self.with_datasets_aux = with_datasets_aux
         assert self.first_stage_gnn_iters < self.gnn_iters, "first_stage_gnn_iters must less than gnn_iters"
         self.proj_head = sem_seg_head # ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
-        self.graph_node_features = graph_node_features #.cuda()
+        self.graph_node_features = graph_node_features.cuda()
         self.total_cats = 0
         # self.datasets_cats = []
         for i in range(0, self.n_datasets):
@@ -86,16 +91,20 @@ class HRNet_W48_ARCH(nn.Module):
         # 初始化 grad
         self.initial = False
         self.inFirstGNNStage = True
+        self.temperature = 0.07
  
         #  if self.MODEL_WEIGHTS != None:
         # state = torch.load('output/pretrain_model_30000.pth')
         # self.load_state_dict(state['model_state_dict'], strict=True)
         self.isLoad = False
         self.with_spa_loss = with_spa_loss
+        self.with_orth_loss = with_orth_loss
+        self.with_adj_loss = with_adj_loss
 
         self.loss_weight_dict = loss_weight_dict
+        self.MSE_sum_loss = torch.nn.MSELoss(reduction='sum')
     
-        self.backbone.load_state_dict( model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth"), strict=False)
+        # self.backbone.load_state_dict( model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth"), strict=False)
   
 
         # self.get_encode_lb_vec()
@@ -103,8 +112,8 @@ class HRNet_W48_ARCH(nn.Module):
     @classmethod
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
-        # sem_seg_head = build_sem_seg_head(cfg, 720)
-        sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
+        sem_seg_head = build_sem_seg_head(cfg, 720)
+        # sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
         gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
@@ -119,7 +128,9 @@ class HRNet_W48_ARCH(nn.Module):
         first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
         num_unify_classes = cfg.DATASETS.NUM_UNIFY_CLASS
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
-        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 1, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 1, "loss_aux6": 1, "loss_spa": 0.1}
+        with_orth_loss = cfg.LOSS.WITH_ORTH_LOSS  
+        with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
+        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 1, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 1, "loss_aux6": 1, "loss_spa": 0.1, "loss_adj":1, "loss_orth":10}
         
         return {
             'backbone': backbone,
@@ -129,7 +140,7 @@ class HRNet_W48_ARCH(nn.Module):
             'with_datasets_aux': with_datasets_aux, 
             'ignore_lb': ignore_lb,
             'ohem_thresh': ohem_thresh,
-            "size_divisibility": cfg.MODEL.SIZE_DIVISIBILITY,
+            "size_divisibility": cfg.INPUT.SIZE_DIVISIBILITY,
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
             "graph_node_features": graph_node_features,
@@ -140,6 +151,8 @@ class HRNet_W48_ARCH(nn.Module):
             "first_stage_gnn_iters": first_stage_gnn_iters,
             "num_unify_classes": num_unify_classes,
             "with_spa_loss": with_spa_loss,
+            "with_orth_loss": with_orth_loss,
+            "with_adj_loss": with_adj_loss,
             "loss_weight_dict": loss_weight_dict
         }
 
@@ -188,6 +201,7 @@ class HRNet_W48_ARCH(nn.Module):
 
             if self.training:
                             # bipartite matching-based loss
+                            
                 losses = {}
                 self.alter_iters += 1
                 for id, logit in enumerate(outputs['logits']):
@@ -204,7 +218,7 @@ class HRNet_W48_ARCH(nn.Module):
                 return losses
             else:
                 
-                logits = F.interpolate(outputs['logits'], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
                 processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
                 return processed_results
         else:
@@ -272,13 +286,42 @@ class HRNet_W48_ARCH(nn.Module):
                         aux_loss = self.criterion(aux_logits, targets[dataset_lbs==i])
                         losses[f'loss_aux{i}'] = aux_loss
                 
-                if self.with_spa_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and iters > self.init_gnn_iters:
-                    if len(bi_graphs)==2*self.n_datasets:
-                        spa_loss = torch.pow(torch.norm(bi_graphs[2*i+1], p='fro'), 2)
+                    if self.with_spa_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and iters > self.init_gnn_iters:
+                        if len(bi_graphs)==2*self.n_datasets:
+                            spa_loss = torch.pow(torch.norm(bi_graphs[2*i+1], p='fro'), 2)
+                        else:
+                            spa_loss =  torch.pow(torch.norm(bi_graphs[i], p='fro'), 2)
+                        
+                        losses[f'loss_spa'] = spa_loss
+                        
+                    if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and iters > self.init_gnn_iters and self.target_bipart is not None:
+                        if len(bi_graphs) == 2*self.n_datasets:
+                            total_num = bi_graphs[2*i+1].shape[0] * bi_graphs[2*i+1].shape[1]
+                            base_weight = 1 / total_num
+                            
+                            if losses['loss_adj'] is None:
+                                losses['loss_adj'] = base_weight * self.MSE_sum_loss(bi_graphs[2*i + 1][self.target_bipart[i] != 255], self.target_bipart[i][self.target_bipart[i] != 255])
+                            else:
+                                losses['loss_adj'] += base_weight * self.MSE_sum_loss(bi_graphs[2*i + 1][self.target_bipart[i] != 255], self.target_bipart[i][self.target_bipart[i] != 255])
+                        else:
+                            total_num = bi_graphs[i].shape[0] * bi_graphs[i].shape[1]
+                            base_weight = 1 / total_num
+                            
+                            if losses['loss_adj'] is None:
+                                losses['loss_adj'] = base_weight * self.MSE_sum_loss(bi_graphs[2*i + 1][self.target_bipart[i] != 255], self.target_bipart[i][self.target_bipart[i] != 255])
+                            else:
+                                losses['loss_adj'] += base_weight * self.MSE_sum_loss(bi_graphs[2*i + 1][self.target_bipart[i] != 255], self.target_bipart[i][self.target_bipart[i] != 255])
+                
+
+
+                if self.with_orth_loss and self.train_seg_or_gnn == self.GNN:
+                    if self.with_datasets_aux:
+                        losses['loss_orth'] = self.similarity_dsb(unify_prototype[self.total_cats:])
                     else:
-                        spa_loss =  torch.pow(torch.norm(bi_graphs[i], p='fro'), 2)
+                        losses['loss_orth'] = self.similarity_dsb(unify_prototype)
+
+                        
                     
-                    losses[f'loss_spa'] = spa_loss
                 for k in list(losses.keys()):
                     if k in self.loss_weight_dict:
                         losses[k] *= self.loss_weight_dict[k]
@@ -296,15 +339,15 @@ class HRNet_W48_ARCH(nn.Module):
                     processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
                 else:
                     if self.with_datasets_aux:
-                        logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
+                        ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
                     else:
-                        logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype)
+                        ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype)
                     if len(bi_graphs) == 2*self.n_datasets:
-                        logits = torch.einsum('bchw, nc -> bnhw', logits, bi_graphs[2*dataset_lbs])
+                        logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[2*dataset_lbs])
                     else:
-                        logits = torch.einsum('bchw, nc -> bnhw', logits, bi_graphs[dataset_lbs])
+                        logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[dataset_lbs])
                     logits = F.interpolate(logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+                    processed_results = [{"sem_seg": logits[i], "uni_logits": ori_logits[i]} for i in range(logits.shape[0])]
                 return processed_results                
 
     def env_init(self, iters):
@@ -463,6 +506,16 @@ class HRNet_W48_ARCH(nn.Module):
             self.unify_prototype.data = unify_prototype
             self.unify_prototype.requires_grad=grad
 
+    def get_bipart_graph(self):
+        _, ori_bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
+        bi_graphs = []
+        if len(ori_bi_graphs) == 2*self.n_datasets:
+            for j in range(0, len(ori_bi_graphs), 2):
+                bi_graphs.append(ori_bi_graphs[j+1].detach())
+        else:
+            bi_graphs = [bigh.detach() for bigh in ori_bi_graphs]
+
+        return bi_graphs
         
     def get_encode_lb_vec(self):
         text_feature_vecs = []
@@ -479,3 +532,26 @@ class HRNet_W48_ARCH(nn.Module):
         self.unify_prototype.data = text_feature_vecs
         self.unify_prototype.requires_grad=False
                 
+    def set_target_bipart(self, target_bipart):
+        self.target_bipart = target_bipart
+        # self.target_bipart.requires_grad=False
+        
+    def similarity_dsb(self, proto_vecs, reduce='mean'):
+        """
+        Compute EM loss with the probability-based distribution of each feature
+        :param feat_domain: source, target or both
+        :param temperature: softmax temperature
+        """
+
+
+        # dot similarity between features and centroids
+        z = torch.mm(proto_vecs, proto_vecs.t())  # size N x C_seen
+
+        # entropy loss to push each feature to be similar to only one class prototype (no supervision)
+        if reduce == 'mean':
+            loss = -1 * torch.mean(F.softmax(z / self.temperature, dim=1) * F.log_softmax(z / self.temperature, dim=1))
+        elif reduce == 'sum':
+            loss = -1 * torch.sum(F.softmax(z / self.temperature, dim=1) * F.log_softmax(z / self.temperature, dim=1))
+            
+
+        return loss

@@ -149,7 +149,6 @@ def add_hrnet_config(cfg):
     cfg.MODEL.WITH_DATASETS_AUX = False
     cfg.MODEL.PRETRAINING = False
 
-    cfg.MODEL.SIZE_DIVISIBILITY = 32
     # LSJ aug
     cfg.INPUT.IMAGE_SIZE = 1024
     cfg.INPUT.MIN_SCALE = 0.1
@@ -163,6 +162,8 @@ def add_hrnet_config(cfg):
     
     cfg.LOSS = CN()
     cfg.LOSS.OHEM_THRESH = 0.7 
+    
+    
 
     cfg.MODEL.SEM_SEG_HEAD.OUTPUT_FEAT_DIM = 19
     cfg.MODEL.SEM_SEG_HEAD.WITH_DATASETS_AUX = False
@@ -200,4 +201,6 @@ def add_gnn_config(cfg):
     
     
     cfg.LOSS.WITH_SPA_LOSS = True
+    cfg.LOSS.WITH_ORTH_LOSS = False
+    cfg.LOSS.WITH_ADJ_LOSS = False
     

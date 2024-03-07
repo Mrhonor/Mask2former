@@ -45,7 +45,7 @@ from detectron2.evaluation import (
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
-from detectron2.engine.hooks import HookBase
+
 
 # MaskFormer
 from mask2former import (
@@ -69,24 +69,44 @@ from PIL import Image
 from detectron2.utils.file_io import PathManager
 import numpy as np
 from functools import partial
+from detectron2.structures import ImageList
+import torch.nn.functional as F
+import logging
 
-def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None):
+
+
+def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None, size_divisibility=-1, ignore_label=255):
+    # logger = logging.getLogger(__name__)
     with PathManager.open(filename, "rb") as f:
-        array = np.array(Image.open(f), copy=False, dtype=dtype)
-    if lb_map is not None:
-        array = lb_map[array]
-    return array
-    
-class eval_link_hook(HookBase):
-    def after_step(self):
-        if self.trainer.iter % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN:
+        image = np.array(Image.open(f), copy=False, dtype=dtype)
+        if lb_map is not None:
+            image = lb_map[image] 
+    #     logger.info(f'size_divisibility: {size_divisibility}')
+    #     if size_divisibility > 0:
+    #         image = torch.tensor(image)
             
-            print(f"Hello at iteration {self.trainer.iter}!")
+    #         image_size = (image.shape[0], image.shape[1])
+    #         padding_size = [
+    #             0,
+    #             size_divisibility - image_size[1],
+    #             0,
+    #             size_divisibility - image_size[0],
+    #         ]
+            
+    #         image = F.pad(image, padding_size, value=ignore_label).contiguous()
+    #         logger.info(f'image shape: {image.shape}')
+    #         image = image.numpy()
+
+    # dsaf
+    return image
+    
+
 
 class Trainer(DefaultTrainer):
     """
     Extension of the Trainer class adapted to MaskFormer.
     """
+
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -113,7 +133,7 @@ class Trainer(DefaultTrainer):
                     dataset_name,
                     distributed=True,
                     output_dir=output_folder,
-                    sem_seg_loading_fn=partial(my_sem_seg_loading_fn, lb_map=lb_map)
+                    sem_seg_loading_fn=partial(my_sem_seg_loading_fn, lb_map=lb_map, size_divisibility=cfg.INPUT.SIZE_DIVISIBILITY, ignore_label=cfg.DATASETS.IGNORE_LB)
                 )
             )
         # instance segmentation
@@ -373,7 +393,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    trainer.register_hooks([eval_link_hook()])
+    # trainer.register_hooks([eval_link_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

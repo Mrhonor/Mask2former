@@ -209,7 +209,6 @@ def register_ade():
 # _root = os.getenv("DETECTRON2_DATASETS", "datasets")
 register_ade()
 
-annpath = f'mask2former/datasets/ADE/training.txt'
 def ade_train(anp):
     # assert mode in ('train', 'eval', 'test')
 

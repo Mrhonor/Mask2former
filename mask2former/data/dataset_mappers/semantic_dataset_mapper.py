@@ -149,7 +149,9 @@ class SemanticDatasetMapper:
             sem_seg_gt = torch.as_tensor(sem_seg_gt.astype("long"))
 
         if self.is_train and self.size_divisibility > 0:
-            image_size = (image.shape[-2], image.shape[-1])
+            image_size = [image.shape[-2], image.shape[-1]] 
+            # image_size[0] = self.size_divisibility if image_size[0] == 0 else image_size[0]
+            # image_size[1] = self.size_divisibility if image_size[1] == 0 else image_size[1]
             padding_size = [
                 0,
                 self.size_divisibility - image_size[1],
