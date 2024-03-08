@@ -158,7 +158,7 @@ labels_info = [
     {"name": "glass, drinking glass", "id": 148, "trainId": 148},
     {"name": "clock", "id": 149, "trainId": 149},
 ]
-dataroot = '/home1/marong/datasets/ADEChallengeData2016'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/ADEChallengeData2016'
 annpath = f'mask2former/datasets/ADE/validation.txt'
 def ade():
     # assert mode in ('train', 'eval', 'test')

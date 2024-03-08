@@ -12,6 +12,7 @@ from detectron2.config import configurable
 from detectron2.layers import Conv2d
 from detectron2.utils.registry import Registry
 from timm.models.layers import trunc_normal_
+import logging
 
 GNN_REGISTRY = Registry("GNN_MODULE")
 GNN_REGISTRY.__doc__ = """
@@ -509,6 +510,8 @@ class Learnable_Topology_BGNN(nn.Module):
         feat1 = self.linear_before(input_x)
         adj_mI, non_norm_adj_mI, adj_feat = self.calc_adjacency_matrix(feat1)
         feat1_relu = self.relu(feat1)
+        # logger = logging.getLogger(__name__)
+        # logger.info(f"adj_mI shape:{adj_mI.shape}, self.adj.shape:{self.adj_matrix.shape}, before_gcn1_x: {feat1_relu.shape}")
         
         before_gcn1_x = F.dropout(feat1_relu, self.dropout_rate, training=self.training)
         feat_gcn1 = self.GCN_layer1(before_gcn1_x, adj_mI)

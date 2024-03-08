@@ -74,7 +74,7 @@ labels_info = [
 {'name': 'Unlabeled', 'id': 65, 'color': [0, 0, 0], 'trainId': 255},
 ]
 
-dataroot = '/home1/marong/datasets/mapi'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/mapi'
 annpath = f'mask2former/datasets/mapi/validation.txt'
 def mapi():
     # assert mode in ('train', 'eval', 'test')

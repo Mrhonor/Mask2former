@@ -21,9 +21,9 @@ MODEL:
     mse_or_adv: "None"
     GNN_type: "GSAGE"
     with_datasets_aux: True
-    init_stage_iters: 100
+    init_stage_iters: 10000
     isGumbelSoftmax: False
-    GNN_ITERS: 200
-    SEG_ITERS: 200
-    FIRST_STAGE_GNN_ITERS: 150
+    GNN_ITERS: 20000
+    SEG_ITERS: 20000
+    FIRST_STAGE_GNN_ITERS: 15000
     INIT_ADJ_PATH: "output/init_adj_7_datasets.pt"

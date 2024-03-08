@@ -398,7 +398,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
+    trainer.register_hooks([eval_link_hook(), iter_info_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

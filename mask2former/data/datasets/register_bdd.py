@@ -28,7 +28,7 @@ labels_info = [
     {"name": "bicycle", "id": 18, "color": [0, 0, 0], "trainId": 18},
 ]
 
-dataroot = '/home1/marong/datasets/bdd100k'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/bdd100k'
 annpath = f'mask2former/datasets/bdd100k/val.txt'
 def bdd():
     # assert mode in ('train', 'eval', 'test')

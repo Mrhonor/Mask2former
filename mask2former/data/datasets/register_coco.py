@@ -141,7 +141,7 @@ labels_info = [
 {"name": "rug-merged", "id": 200, "trainId": 132},
 {"name": "unlabeled", "id":0, "trainId": 255},
 ]
-dataroot = '/home1/marong/datasets/coco'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/coco'
 annpath = f'mask2former/datasets/coco/val.txt'
 def coco():
     # assert mode in ('train', 'eval', 'test')

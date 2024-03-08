@@ -47,7 +47,7 @@ labels_info = [
     {"name": "unlabel", "id":255, "color":[0,0,0], "trainId": 255},
 ]
 
-dataroot = '/home1/marong/datasets/idd'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/idd'
 annpath = f'mask2former/datasets/IDD/val.txt'
 def idd():
     # assert mode in ('train', 'eval', 'test')
