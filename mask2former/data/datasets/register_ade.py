@@ -190,7 +190,11 @@ def register_ade():
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
-        lb_map[el['id']] = el['trainId']
+        # lb_map[el['id']] = el['trainId']
+        if el['id'] == 0:
+            lb_map[el['id']] = 255
+        else:
+            lb_map[el['id']] = el['id'] - 1
 
     name = f"ade_sem_seg_val"
     DatasetCatalog.register(

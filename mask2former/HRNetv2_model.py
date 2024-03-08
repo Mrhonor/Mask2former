@@ -199,10 +199,16 @@ class HRNet_W48_ARCH(nn.Module):
                             
                 losses = {}
                 self.alter_iters += 1
-                for id, logit in enumerate(outputs['logits']):
+                for idx, logit in enumerate(outputs['logits']):
                     logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    loss = self.criterion(logits, targets[dataset_lbs==id])
-                    losses[f'loss_ce{id}'] = loss
+                    loss = self.criterion(logits, targets[dataset_lbs==idx])
+                    
+                    if torch.isnan(loss):
+                        logger.info(f"sem_seg_file_name:{batched_inputs[2*idx]['sem_seg_file_name']}, {torch.min(targets[dataset_lbs==idx])}")
+                        
+                        continue
+                    losses[f'loss_ce{idx}'] = loss
+                        
                 
                 # for k in list(losses.keys()):
                 #     if k in self.criterion.weight_dict:
