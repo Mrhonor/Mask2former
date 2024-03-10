@@ -8,6 +8,9 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone, build_sem_se
 from detectron2.modeling.backbone import Backbone
 from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.modeling.postprocessing import sem_seg_postprocess
+
+
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
 from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
@@ -114,8 +117,8 @@ class HRNet_W48_ARCH(nn.Module):
     @classmethod
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
-        sem_seg_head = build_sem_seg_head(cfg, 720)
-        # sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
+        # sem_seg_head = build_sem_seg_head(cfg, 720)
+        sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
         gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
@@ -173,14 +176,13 @@ class HRNet_W48_ARCH(nn.Module):
         #     targets = batched_inputs['sem_seg'].cuda()
         #     features = self.backbone(images)  
         # else:
-
         
         images = [x["image"].cuda() for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
-        if self.training:
-            images = ImageList.from_tensors(images, self.size_divisibility)
-        else:
-            images = ImageList.from_tensors(images, -1)
+        # if self.training:
+        images = ImageList.from_tensors(images, self.size_divisibility)
+        # else:
+        #     images = ImageList.from_tensors(images, -1)
         targets = [x["sem_seg"].cuda() for x in batched_inputs]
         targets = self.prepare_targets(targets, images)
         targets = torch.cat(targets, dim=0)
@@ -204,7 +206,7 @@ class HRNet_W48_ARCH(nn.Module):
                     loss = self.criterion(logits, targets[dataset_lbs==idx])
                     
                     if torch.isnan(loss):
-                        logger.info(f"sem_seg_file_name:{batched_inputs[2*idx]['sem_seg_file_name']}, {torch.min(targets[dataset_lbs==idx])}")
+                        logger.info(f"file_name:{batched_inputs[2*idx]['file_name']}, {torch.min(targets[dataset_lbs==idx])}")
                         
                         continue
                     losses[f'loss_ce{idx}'] = loss
@@ -218,9 +220,15 @@ class HRNet_W48_ARCH(nn.Module):
                 #         losses.pop(k)
                 return losses
             else:
-                
-                logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
-                processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+                processed_results = []
+                for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                    height = input_per_image.get("height", image_size[0])
+                    width = input_per_image.get("width", image_size[1])
+                    # logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
+                    
+                    logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                    # logger.info(f"logit shape:{logit.shape}")
+                    processed_results.append({"sem_seg": logit})
                 return processed_results
         else:
             self.env_init(self.iters)
@@ -337,8 +345,15 @@ class HRNet_W48_ARCH(nn.Module):
                 outputs = self.proj_head(features, dataset_lbs)
                 unify_prototype, bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
                 if self.train_seg_or_gnn == self.SEG:
-                    logits = F.interpolate(outputs['logits'], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+                    processed_results = []
+                    for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                        height = input_per_image.get("height", image_size[0])
+                        width = input_per_image.get("width", image_size[1])
+                        # logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
+                        
+                        logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                        # logger.info(f"logit shape:{logit.shape}")
+                        processed_results.append({"sem_seg": logit})
                 else:
                     if self.with_datasets_aux:
                         ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
@@ -348,9 +363,16 @@ class HRNet_W48_ARCH(nn.Module):
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[2*dataset_lbs])
                     else:
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[dataset_lbs])
-                    logits = F.interpolate(logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-
-                    processed_results = [{"sem_seg": logits[i], "uni_logits": ori_logits[i]} for i in range(logits.shape[0])]
+                    processed_results = []
+                    for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                        height = input_per_image.get("height", image_size[0])
+                        width = input_per_image.get("width", image_size[1])
+                        # logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
+                        
+                        logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                        # logger.info(f"logit shape:{logit.shape}")
+                        processed_results.append({"sem_seg": logit, "uni_logits": ori_logits})
+                    
                 return processed_results                
 
     def env_init(self, iters):
