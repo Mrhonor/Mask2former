@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/hrnet_pretrain_10w.pth"
+  WEIGHTS: "output/model_0019999.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:

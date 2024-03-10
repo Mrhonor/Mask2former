@@ -754,9 +754,9 @@ class Learnable_Topology_BGNN(nn.Module):
         # feat3 = feat_gcn2 + feat2
         feat_gcn3 = self.GCN_layer3(feat_gcn2, adj_mI)
 
-        feat_gcn4 = self.GCN_layer4(feat_gcn3, adj_mI)
+        # feat_gcn4 = self.GCN_layer4(feat_gcn3, adj_mI)
         # feat4 = F.elu(feat_gcn3 + feat3)
-        feat_out = self.linear1(feat_gcn4)
+        feat_out = self.linear1(feat_gcn3)
 
         if init:
             if self.calc_bipartite:

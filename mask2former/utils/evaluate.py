@@ -678,7 +678,7 @@ class find_unuse_hook(HookBase):
 class eval_link_hook(HookBase):
     @torch.no_grad()
     def after_step(self):
-        if (self.trainer.iter+1) % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN and not self.trainer.model.init_gnn_stage:
+        if self.trainer.iter % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN and not self.trainer.model.init_gnn_stage:
             logger = logging.getLogger(__name__)
             logger.info(f"eval link at iteration {self.trainer.iter}!")
             # org_aux = net.aux_mode

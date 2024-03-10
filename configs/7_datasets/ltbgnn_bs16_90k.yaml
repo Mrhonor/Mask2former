@@ -21,7 +21,7 @@ MODEL:
     mse_or_adv: "None"
     GNN_type: "GSAGE"
     with_datasets_aux: True
-    init_stage_iters: 10000
+    init_stage_iters: -1
     isGumbelSoftmax: False
     GNN_ITERS: 20000
     SEG_ITERS: 20000

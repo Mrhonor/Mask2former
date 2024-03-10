@@ -12,7 +12,7 @@ import clip
 import logging
 
 # backbone_url = './res/hrnetv2_w48_imagenet_pretrained.pth'
-Log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 def BNReLU(num_features, bn_type=None, **kwargs):
     if bn_type == 'torchbn':
         return nn.Sequential(
@@ -233,7 +233,8 @@ class HRNet_W48(nn.Module):
             
             return {'logits':remap_logits, 'emb':emb}
         else:
-            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype) 
+            # logger.info(f'emb : dtype{emb.dtype}, unify_prototype : dtype{self.unify_prototype.dtype}')
+            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.float()) 
             if not isinstance(dataset_ids, int):
                 remap_logits = []
                 for i in range(self.n_datasets):

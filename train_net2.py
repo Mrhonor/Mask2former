@@ -253,7 +253,7 @@ class Trainer(DefaultTrainer):
         elif 'idd' in dataset_name:
             dataset_id = 4
         elif 'ade' in dataset_name:
-            dataset_id = 0
+            dataset_id = 5
         elif 'coco' in dataset_name:
             dataset_id = 6
         else:
@@ -292,7 +292,7 @@ class Trainer(DefaultTrainer):
         memo: Set[torch.nn.parameter.Parameter] = set()
         for module_name, module in model.named_modules():
             for module_param_name, value in module.named_parameters(recurse=False):
-                if not value.requires_grad:
+                if not value.requires_grad and 'adj_matrix' not in module_param_name:
                     continue
                 # Avoid duplicating parameters
                 if value in memo:
@@ -372,7 +372,7 @@ def setup(args):
     add_deeplab_config(cfg)
     add_hrnet_config(cfg)
     add_gnn_config(cfg)
-    add_maskformer2_config(cfg)
+    # add_maskformer2_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()
