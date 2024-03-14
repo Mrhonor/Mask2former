@@ -190,11 +190,11 @@ def register_ade():
     # dirname = 'train'
     lb_map = {}
     for el in labels_info:
-        # lb_map[el['id']] = el['trainId']
-        if el['id'] == 0:
-            lb_map[el['id']] = 255
-        else:
-            lb_map[el['id']] = el['id'] - 1
+        lb_map[el['id']] = el['trainId']
+        # if el['id'] == 0:
+        #     lb_map[el['id']] = 255
+        # else:
+        #     lb_map[el['id']] = el['id'] - 1
 
     name = f"ade_sem_seg_val"
     DatasetCatalog.register(
@@ -261,3 +261,187 @@ def register_ade_train():
 
 register_ade_train()
 
+
+Mseg_label_info = [{'name': 'unlabel', 'id': 0, 'trainId': 255},
+{'name': 'flag', 'id': 150, 'trainId': 95},
+{'name': 'wall', 'id': 1, 'trainId': 114},
+{'name': 'building', 'id': 2, 'trainId': 19},
+{'name': 'sky', 'id': 3, 'trainId': 82},
+{'name': 'floor', 'id': 4, 'trainId': 22},
+{'name': 'tree', 'id': 5, 'trainId': 101},
+{'name': 'ceiling', 'id': 6, 'trainId': 20},
+{'name': 'road', 'id': 7, 'trainId': 60},
+{'name': 'bed', 'id': 8, 'trainId': 33},
+{'name': 'windowpane', 'id': 9, 'trainId': 115},
+{'name': 'grass', 'id': 10, 'trainId': 63},
+{'name': 'cabinet', 'id': 11, 'trainId': 56},
+{'name': 'sidewalk', 'id': 12, 'trainId': 61},
+{'name': 'person', 'id': 13, 'trainId': 77},
+{'name': 'earth', 'id': 14, 'trainId': 63},
+{'name': 'door', 'id': 15, 'trainId': 47},
+{'name': 'table', 'id': 16, 'trainId': 34},
+{'name': 'mountain', 'id': 17, 'trainId': 86},
+{'name': 'plant', 'id': 18, 'trainId': 255},
+{'name': 'curtain', 'id': 19, 'trainId': 97},
+{'name': 'chair', 'id': 20, 'trainId': 25},
+{'name': 'car', 'id': 21, 'trainId': 103},
+{'name': 'water', 'id': 22, 'trainId': 111},
+{'name': 'painting', 'id': 23, 'trainId': 69},
+{'name': 'sofa', 'id': 24, 'trainId': 30},
+{'name': 'shelf', 'id': 25, 'trainId': 53},
+{'name': 'house', 'id': 26, 'trainId': 19},
+{'name': 'sea', 'id': 27, 'trainId': 110},
+{'name': 'mirror', 'id': 28, 'trainId': 52},
+{'name': 'rug', 'id': 29, 'trainId': 100},
+{'name': 'field', 'id': 30, 'trainId': 63},
+{'name': 'armchair', 'id': 31, 'trainId': 26},
+{'name': 'seat', 'id': 32, 'trainId': 29},
+{'name': 'fence', 'id': 33, 'trainId': 84},
+{'name': 'desk', 'id': 34, 'trainId': 37},
+{'name': 'rock', 'id': 35, 'trainId': 87},
+{'name': 'wardrobe', 'id': 36, 'trainId': 39},
+{'name': 'lamp', 'id': 37, 'trainId': 49},
+{'name': 'bathtub', 'id': 38, 'trainId': 14},
+{'name': 'railing', 'id': 39, 'trainId': 85},
+{'name': 'cushion', 'id': 40, 'trainId': 98},
+{'name': 'base', 'id': 41, 'trainId': 89},
+{'name': 'box', 'id': 42, 'trainId': 65},
+{'name': 'column', 'id': 43, 'trainId': 91},
+{'name': 'signboard', 'id': 44, 'trainId': 255},
+{'name': 'chest of drawers', 'id': 45, 'trainId': 42},
+{'name': 'counter', 'id': 46, 'trainId': 44},
+{'name': 'sand', 'id': 47, 'trainId': 63},
+{'name': 'sink', 'id': 48, 'trainId': 8},
+{'name': 'skyscraper', 'id': 49, 'trainId': 19},
+{'name': 'fireplace', 'id': 50, 'trainId': 57},
+{'name': 'refrigerator', 'id': 51, 'trainId': 9},
+{'name': 'grandstand', 'id': 52, 'trainId': 19},
+{'name': 'path', 'id': 53, 'trainId': 61},
+{'name': 'stairs', 'id': 54, 'trainId': 54},
+{'name': 'runway', 'id': 55, 'trainId': 62},
+{'name': 'case', 'id': 56, 'trainId': 1},
+{'name': 'pool table', 'id': 57, 'trainId': 35},
+{'name': 'pillow', 'id': 58, 'trainId': 98},
+{'name': 'screen door', 'id': 59, 'trainId': 47},
+{'name': 'stairway', 'id': 60, 'trainId': 54},
+{'name': 'river', 'id': 61, 'trainId': 109},
+{'name': 'bridge', 'id': 62, 'trainId': 16},
+{'name': 'bookcase', 'id': 63, 'trainId': 43},
+{'name': 'blind', 'id': 64, 'trainId': 116},
+{'name': 'coffee table', 'id': 65, 'trainId': 34},
+{'name': 'toilet', 'id': 66, 'trainId': 13},
+{'name': 'flower', 'id': 67, 'trainId': 101},
+{'name': 'book', 'id': 68, 'trainId': 64},
+{'name': 'hill', 'id': 69, 'trainId': 86},
+{'name': 'bench', 'id': 70, 'trainId': 80},
+{'name': 'countertop', 'id': 71, 'trainId': 45},
+{'name': 'stove', 'id': 72, 'trainId': 58},
+{'name': 'palm', 'id': 73, 'trainId': 101},
+{'name': 'kitchen island', 'id': 74, 'trainId': 46},
+{'name': 'computer', 'id': 75, 'trainId': 255},
+{'name': 'swivel chair', 'id': 76, 'trainId': 27},
+{'name': 'boat', 'id': 77, 'trainId': 108},
+{'name': 'bar', 'id': 78, 'trainId': 255},
+{'name': 'arcade machine', 'id': 79, 'trainId': 59},
+{'name': 'hovel', 'id': 80, 'trainId': 19},
+{'name': 'bus', 'id': 81, 'trainId': 106},
+{'name': 'towel', 'id': 82, 'trainId': 99},
+{'name': 'light', 'id': 83, 'trainId': 48},
+{'name': 'truck', 'id': 84, 'trainId': 107},
+{'name': 'tower', 'id': 85, 'trainId': 19},
+{'name': 'chandelier', 'id': 86, 'trainId': 51},
+{'name': 'awning', 'id': 87, 'trainId': 93},
+{'name': 'streetlight', 'id': 88, 'trainId': 78},
+{'name': 'booth', 'id': 89, 'trainId': 19},
+{'name': 'television receiver', 'id': 90, 'trainId': 21},
+{'name': 'airplane', 'id': 91, 'trainId': 105},
+{'name': 'dirt track', 'id': 92, 'trainId': 63},
+{'name': 'apparel', 'id': 93, 'trainId': 94},
+{'name': 'pole', 'id': 94, 'trainId': 83},
+{'name': 'land', 'id': 95, 'trainId': 63},
+{'name': 'bannister', 'id': 96, 'trainId': 85},
+{'name': 'escalator', 'id': 97, 'trainId': 55},
+{'name': 'ottoman', 'id': 98, 'trainId': 38},
+{'name': 'bottle', 'id': 99, 'trainId': 72},
+{'name': 'buffet', 'id': 100, 'trainId': 56},
+{'name': 'poster', 'id': 101, 'trainId': 70},
+{'name': 'stage', 'id': 102, 'trainId': 23},
+{'name': 'van', 'id': 103, 'trainId': 103},
+{'name': 'ship', 'id': 104, 'trainId': 108},
+{'name': 'fountain', 'id': 105, 'trainId': 92},
+{'name': 'conveyer belt', 'id': 106, 'trainId': 7},
+{'name': 'canopy', 'id': 107, 'trainId': 255},
+{'name': 'washer', 'id': 108, 'trainId': 10},
+{'name': 'plaything', 'id': 109, 'trainId': 68},
+{'name': 'swimming pool', 'id': 110, 'trainId': 112},
+{'name': 'stool', 'id': 111, 'trainId': 28},
+{'name': 'barrel', 'id': 112, 'trainId': 36},
+{'name': 'basket', 'id': 113, 'trainId': 41},
+{'name': 'waterfall', 'id': 114, 'trainId': 113},
+{'name': 'tent', 'id': 115, 'trainId': 18},
+{'name': 'bag', 'id': 116, 'trainId': 0},
+{'name': 'minibike', 'id': 117, 'trainId': 104},
+{'name': 'cradle', 'id': 118, 'trainId': 40},
+{'name': 'oven', 'id': 119, 'trainId': 5},
+{'name': 'ball', 'id': 120, 'trainId': 88},
+{'name': 'food', 'id': 121, 'trainId': 24},
+{'name': 'step', 'id': 122, 'trainId': 255},
+{'name': 'tank', 'id': 123, 'trainId': 6},
+{'name': 'trade name', 'id': 124, 'trainId': 81},
+{'name': 'microwave', 'id': 125, 'trainId': 3},
+{'name': 'pot', 'id': 126, 'trainId': 32},
+{'name': 'animal', 'id': 127, 'trainId': 2},
+{'name': 'bicycle', 'id': 128, 'trainId': 102},
+{'name': 'lake', 'id': 129, 'trainId': 109},
+{'name': 'dishwasher', 'id': 130, 'trainId': 12},
+{'name': 'screen', 'id': 131, 'trainId': 255},
+{'name': 'blanket', 'id': 132, 'trainId': 96},
+{'name': 'sculpture', 'id': 133, 'trainId': 90},
+{'name': 'hood', 'id': 134, 'trainId': 75},
+{'name': 'sconce', 'id': 135, 'trainId': 50},
+{'name': 'vase', 'id': 136, 'trainId': 67},
+{'name': 'traffic light', 'id': 137, 'trainId': 79},
+{'name': 'tray', 'id': 138, 'trainId': 74},
+{'name': 'ashcan', 'id': 139, 'trainId': 31},
+{'name': 'fan', 'id': 140, 'trainId': 11},
+{'name': 'pier', 'id': 141, 'trainId': 17},
+{'name': 'crt screen', 'id': 142, 'trainId': 255},
+{'name': 'plate', 'id': 143, 'trainId': 76},
+{'name': 'monitor', 'id': 144, 'trainId': 255},
+{'name': 'bulletin board', 'id': 145, 'trainId': 71},
+{'name': 'shower', 'id': 146, 'trainId': 15},
+{'name': 'radiator', 'id': 147, 'trainId': 4},
+{'name': 'glass', 'id': 148, 'trainId': 73},
+{'name': 'clock', 'id': 149, 'trainId': 66}]
+
+num = 117
+def register_ade_mseg():
+    
+    
+    # meta = _get_ade20k_full_meta()
+    # for name, dirname in [("train", "train"), ("val", "val")]:
+    # dirname = 'train'
+    lb_map = {}
+    for el in Mseg_label_info:
+        lb_map[el['id']] = el['trainId']
+    
+    train_to_mseg_map = {}
+    for train, mseg in zip(labels_info, Mseg_label_info):
+        train_to_mseg_map[train['trainId']] = mseg['trainId']
+    for n, anp in [("train", "training"), ("train_1", "training_1"), ("train_2", "training_2"), ("val", "validation")]:
+        name = f"ade_mseg_sem_seg_{n}"
+        annpath = f'mask2former/datasets/ADE/{anp}.txt'
+        DatasetCatalog.register(
+            name, lambda x=annpath : ade_train(x)
+        )
+        
+        MetadataCatalog.get(name).set(
+            stuff_classes=["bag", "case", "animal", "microwave", "radiator", "oven", "storage_tank", "conveyor_belt", "sink", "refrigerator", "washer_dryer", "fan", "dishwasher", "toilet", "bathtub", "shower", "bridge", "pier_wharf", "tent", "building", "ceiling", "television", "floor", "stage", "food_other", "chair_other", "armchair", "swivel_chair", "stool", "seat", "couch", "trash_can", "potted_plant", "bed", "table", "pool_table", "barrel", "desk", "ottoman", "wardrobe", "crib", "basket", "chest_of_drawers", "bookshelf", "counter_other", "bathroom_counter", "kitchen_island", "door", "light_other", "lamp", "sconce", "chandelier", "mirror", "shelf", "stairs", "escalator", "cabinet", "fireplace", "stove", "arcade_machine", "road", "sidewalk_pavement", "runway", "terrain", "book", "box", "clock", "vase", "plaything_other", "painting", "poster", "bulletin_board", "bottle", "wine_glass", "tray", "range_hood", "plate", "person", "streetlight", "traffic_light", "bench", "billboard", "sky", "pole", "fence", "railing_banister", "mountain_hill", "rock", "sports_ball", "base", "sculpture", "column", "fountain", "awning", "apparel", "flag", "blanket", "curtain_other", "pillow", "towel", "rug_floormat", "vegetation", "bicycle", "car", "motorcycle", "airplane", "bus", "truck", "boat_ship", "river_lake", "sea", "water_other", "swimming_pool", "waterfall", "wall", "window", "window_blind"],
+            stuff_dataset_id_to_contiguous_id=lb_map,
+            thing_dataset_id_to_contiguous_id=lb_map,
+            evaluator_type="sem_seg",
+            ignore_label=255,  
+            trainId_to_msegId=train_to_mseg_map
+        )
+
+register_ade_mseg()

@@ -943,14 +943,16 @@ class LoaderAdapter:
             self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)            
         else: # aux_mode == 'eval':
             
-            if dataset_id > 0:
-                mapper = SemanticDatasetMapper(cfg, False, dataset_id-1, True)
-                Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
-                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
-            else:
-                mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
-                Log.info(f"evaluate {self.datasets_name[dataset_id]}")
-                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
+            # if dataset_id > 0:
+            #     mapper = SemanticDatasetMapper(cfg, False, dataset_id-1, True)
+            #     Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
+            #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
+            # else:
+            mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
+            Log.info(f"evaluate {self.datasets_name[dataset_id]}")
+            self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
+        # else:
+        #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id])
             
         
         # self.configer = Configer(configs=cfg.DATASETS.CONFIGER)

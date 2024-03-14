@@ -1,13 +1,11 @@
-_BASE_: Base-Cityscapes-SemanticSegmentation_gnn.yaml
+_BASE_: Base-Cityscapes-SemanticSegmentation_snp.yaml
 MODEL:
   META_ARCHITECTURE: "HRNet_W48_ARCH"
-  PRETRAINING: False
   SEM_SEG_HEAD:
-    NAME: "HRNet_W48"
+    NAME: "SemsegModel"
     OUTPUT_FEAT_DIM: 512
     BN_TYPE: "torchbn"
   GNN:
-    GNN_MODEL_NAME: "Learnable_Topology_BGNN"
     NFEAT: 1024
     NFEAT_OUT: 512
     nfeat_adj: 256
@@ -20,11 +18,10 @@ MODEL:
     uot_ratio: 1.01
     mse_or_adv: "None"
     GNN_type: "GSAGE"
-    with_datasets_aux: True
-    init_stage_iters: -1
+    with_datasets_aux: False
+    init_stage_iters: 10000
     isGumbelSoftmax: False
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
     INIT_ADJ_PATH: "output/init_adj_7_datasets.pt"
-    N_POINTS: 1024

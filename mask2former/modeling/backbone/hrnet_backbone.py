@@ -665,9 +665,9 @@ class HighResolutionNet(Backbone):
             elif name.find('affine_bias') != -1:
                 nn.init.zeros_(param)
         
-        # if self.MODEL_WEIGHTS != None:
-        #     state = torch.load(self.MODEL_WEIGHTS)
-        #     self.load_state_dict(state, strict=False)
+        if self.MODEL_WEIGHTS != None:
+            state = torch.load(self.MODEL_WEIGHTS)
+            self.load_state_dict(state, strict=False)
 
     def _make_head(self, pre_stage_channels, bn_type, bn_momentum):
         head_block = Bottleneck

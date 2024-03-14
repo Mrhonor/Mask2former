@@ -46,7 +46,7 @@ labels_info = [
 {"name": "bag", "id": 37, "trainId": 0},
 ]
 
-dataroot = '/home1/marong/datasets'
+dataroot = '/home1/marong/datasets/'
 annpath = f'mask2former/datasets/sunrgbd/test.txt'
 def sunrgbd():
     # assert mode in ('train', 'eval', 'test')

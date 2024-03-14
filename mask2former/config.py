@@ -148,7 +148,7 @@ def add_hrnet_config(cfg):
     cfg.MODEL.AUX_MODE = "train"
     cfg.MODEL.WITH_DATASETS_AUX = False
     cfg.MODEL.PRETRAINING = False
-
+    cfg.MODEL.SIZE_DIVISIBILITY = -1
     # LSJ aug
     cfg.INPUT.IMAGE_SIZE = 1024
     cfg.INPUT.MIN_SCALE = 0.1
@@ -199,9 +199,11 @@ def add_gnn_config(cfg):
     cfg.MODEL.GNN.SEG_ITERS = 20000
     cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS = 15000
     cfg.MODEL.GNN.INIT_ADJ_PATH = 'output/init_adj_7_datasets.pt'
+    cfg.MODEL.GNN.N_POINTS = 12455
     
     
     cfg.LOSS.WITH_SPA_LOSS = True
     cfg.LOSS.WITH_ORTH_LOSS = False
     cfg.LOSS.WITH_ADJ_LOSS = False
+
     

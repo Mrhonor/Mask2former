@@ -23,8 +23,11 @@ from .data.dataset_mappers.semantic_dataset_mapper import SemanticDatasetMapper
 # models
 from .maskformer_model import MaskFormer
 from .HRNetv2_model import HRNet_W48_ARCH
+from .HRNetv2_model_finetune import HRNet_W48_Finetune_ARCH
+from .HRNetv2_model_mseg_eval import HRNet_W48_Mseg_ARCH
 from .test_time_augmentation import SemanticSegmentorWithTTA
 
 # evaluation
 from .evaluation.instance_evaluation import InstanceSegEvaluator
 from .data.dataloader.DaliDataLoader import DaLiLoaderAdapter, LoaderAdapter
+from .utils.build_bipartite_graph_for_unseen import build_bipartite_graph_for_unseen

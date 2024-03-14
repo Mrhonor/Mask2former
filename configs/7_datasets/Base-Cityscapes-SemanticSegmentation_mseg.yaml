@@ -1,8 +1,8 @@
 MODEL:
   BACKBONE:
     FREEZE_AT: 0
-    NAME: "SnpResNet"
-  WEIGHTS: "output/model_0044999.pth"
+    NAME: "HighResolutionNet"
+  WEIGHTS: "output/hrnet_gnn.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -12,21 +12,24 @@ MODEL:
     FULL_RES_STEM: False
     BN_TYPE: "torchbn"  # use syncbn for cityscapes dataset
   AUX_MODE: "train"
-  PRETRAINING: True
+  PRETRAINING: False
 DATASETS:
   TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "sunrgbd_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "ade_sem_seg_train", "coco_sem_seg_train")
-  TEST: ("cs_sem_seg_val", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
+  EVAL: ("cs_sem_seg_train_2", "mapi_sem_seg_train_2", "sunrgbd_sem_seg_train_2", "bdd_sem_seg_train_2", "idd_sem_seg_train_2", "ade_sem_seg_train_2", "coco_sem_seg_train_2")
+  TEST: ("cs_sem_seg_val", "mapi_mseg_sem_seg_val", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_mseg_sem_seg_val", "coco_mseg_sem_seg_val")
   DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 448
+  NUM_UNIFY_CLASS: 268
   CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'
 LOSS:
   OHEM_THRESH: 0.7 
   WITH_SPA_LOSS: True
+  WITH_ORTH_LOSS: True
+  WITH_ADJ_LOSS: True
 SOLVER:
-  IMS_PER_BATCH: 6
+  IMS_PER_BATCH: 2
   BASE_LR: 0.0001
-  MAX_ITER: 100000
+  MAX_ITER: 40000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 0
   WEIGHT_DECAY: 0.05
@@ -52,7 +55,7 @@ INPUT:
     SIZE: (768, 768)
     SINGLE_CATEGORY_MAX_AREA: 1.0
   COLOR_AUG_SSD: True
-  SIZE_DIVISIBILITY: 768
+  SIZE_DIVISIBILITY: -1
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:
