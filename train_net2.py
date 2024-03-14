@@ -73,7 +73,7 @@ from detectron2.structures import ImageList
 import torch.nn.functional as F
 import logging
 
-from mask2former.utils.evaluate import eval_link_hook, iter_info_hook
+from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook
 
 
 def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None, size_divisibility=-1, ignore_label=255):
@@ -398,7 +398,8 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    trainer.register_hooks([eval_link_hook(), iter_info_hook()])
+    # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
+    trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

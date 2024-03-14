@@ -858,7 +858,7 @@ class Learnable_Topology_BGNN(nn.Module):
             Q_st = ot.unbalanced.sinkhorn_knopp_unbalanced(alpha, self.beta[i], this_bipartite_graph.T.cpu().numpy(), 
                                                             reg=0.01, reg_m=5, stopThr=1e-6) 
 
-            Q_st = torch.from_numpy(Q_st).float().cuda()
+            Q_st = torch.from_numpy(Q_st).cuda()
 
             # make sum equals to 1
             sum_pi = torch.sum(Q_st)
@@ -929,7 +929,7 @@ class Learnable_Topology_BGNN(nn.Module):
             self.beta[i] = mu*self.beta[i] + (1-mu)*new_beta
             # print(out_bipartite_graphs)
             # print(torch.max(out_bipartite_graphs, dim=1))
-            bipartite_graphs.append(out_bipartite_graphs) 
+            bipartite_graphs.append(out_bipartite_graphs.to(adj.dtype)) 
                 
             cur_cat += self.dataset_cats[i]
         

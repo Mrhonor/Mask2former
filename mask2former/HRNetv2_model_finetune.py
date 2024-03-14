@@ -39,11 +39,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 pixel_mean,
                 pixel_std,
                 graph_node_features,
-                init_gnn_iters,
-                Pretraining,
-                gnn_iters,
-                seg_iters,
-                first_stage_gnn_iters,
+                finetune_stage1_iters,
                 num_unify_classes,
                 with_spa_loss,
                 loss_weight_dict,
@@ -62,23 +58,17 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
         
         self.register_buffer("finetune_stage", torch.zeros(1), False)
-        self.register_buffer("proto_init", torch.zeros(1), False)
+        self.register_buffer("proto_init", torch.ones(1), False)
 
         # self.register_buffer("target_bipart", torch.ParameterList([]), False)
 
         
         #self.GNN = torch.ones(1)
         #self.SEG = torch.zeros(1)
-        self.init_gnn_iters = init_gnn_iters
-        self.Pretraining = Pretraining
-        
-        self.gnn_iters = gnn_iters
-        self.seg_iters = seg_iters
-        self.first_stage_gnn_iters = first_stage_gnn_iters
-        self.sec_stage_gnn_iters = gnn_iters - first_stage_gnn_iters
+        self.finetune_stage1_iters = finetune_stage1_iters
         self.with_datasets_aux = with_datasets_aux
-        assert self.first_stage_gnn_iters < self.gnn_iters, "first_stage_gnn_iters must less than gnn_iters"
         self.proj_head = sem_seg_head # ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
+        self.proj_head.req_grad(True)
         self.graph_node_features = graph_node_features.cuda()
         self.iters = 0
         self.total_cats = 0
@@ -122,12 +112,8 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
 
         with_datasets_aux = cfg.MODEL.GNN.with_datasets_aux
         graph_node_features = gen_graph_node_feature(cfg)
-        init_gnn_iters = cfg.MODEL.GNN.init_stage_iters
-        Pretraining = cfg.MODEL.PRETRAINING
-        gnn_iters = cfg.MODEL.GNN.GNN_ITERS
-        seg_iters = cfg.MODEL.GNN.SEG_ITERS
-        first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
         num_unify_classes = cfg.DATASETS.NUM_UNIFY_CLASS
+        finetune_stage1_iters = cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
         with_orth_loss = cfg.LOSS.WITH_ORTH_LOSS  
         with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
@@ -145,11 +131,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             "pixel_mean": cfg.MODEL.PIXEL_MEAN,
             "pixel_std": cfg.MODEL.PIXEL_STD,
             "graph_node_features": graph_node_features,
-            "init_gnn_iters": init_gnn_iters,
-            "Pretraining": Pretraining,
-            "gnn_iters": gnn_iters,
-            "seg_iters": seg_iters,
-            "first_stage_gnn_iters": first_stage_gnn_iters,
+            "finetune_stage1_iters": finetune_stage1_iters,
             "num_unify_classes": num_unify_classes,
             "with_spa_loss": with_spa_loss,
             "with_orth_loss": with_orth_loss,
@@ -159,14 +141,15 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
 
 
     def forward(self, batched_inputs, dataset=0):
-        self.env_init()
+        if self.training:
+            self.env_init()
         
         images = [x["image"].cuda() for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
-        if self.training:
-            images = ImageList.from_tensors(images, self.size_divisibility)
-        else:
-            images = ImageList.from_tensors(images, -1)
+        # if self.training:
+        images = ImageList.from_tensors(images, self.size_divisibility)
+        # else:
+        #     images = ImageList.from_tensors(images, -1)
         targets = [x["sem_seg"].cuda() for x in batched_inputs]
         targets = self.prepare_targets(targets, images)
         targets = torch.cat(targets, dim=0)
@@ -177,51 +160,49 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             dataset_lbs = int(batched_inputs[0]["dataset_id"])
         
 
-            features = self.backbone(images.tensor)
-            outputs = self.proj_head(features, dataset_lbs)
+        features = self.backbone(images.tensor)
+        outputs = self.proj_head(features, dataset_lbs)
+        
 
-            if self.training:
-                            # bipartite matching-based loss
-                remap_logits = outputs['logits']
-                if self.with_datasets_aux:
-                    aux_logits_out = outputs['aux_logits']
-                losses = {}
-                self.alter_iters += 1
-                for id, logit in enumerate(remap_logits):
-                    logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    loss = self.criterion(logits, targets[dataset_lbs==id])
-                    losses[f'loss_ce{id}'] = loss
-                
-                if self.with_datasets_aux:
-                    for idx, aux_logits in enumerate(aux_logits_out):
-                    
-                        aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                        aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
-                        losses[f'loss_aux{idx}'] = aux_loss
-                for k in list(losses.keys()):
-                    if k in self.criterion.weight_dict:
-                        losses[k] *= self.criterion.weight_dict[k]
-                #     else:
-                #         # remove this loss if not specified in `weight_dict`
-                #         losses.pop(k)
-                return losses
-            else:
-                
-                logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
-                processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+        if self.training:
+                        # bipartite matching-based loss
+            remap_logits = outputs['logits']
 
-                return processed_results                
+            if self.with_datasets_aux:
+                aux_logits_out = outputs['aux_logits']
+            losses = {}
+
+            for id, logit in enumerate(remap_logits):
+                logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+            
+                loss = self.criterion(logits, targets[dataset_lbs==id])
+                losses[f'loss_ce{id}'] = loss
+
+            
+            if self.with_datasets_aux:
+                for idx, aux_logits in enumerate(aux_logits_out):
+                
+                    aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
+                    losses[f'loss_aux{idx}'] = aux_loss
+            for k in list(losses.keys()):
+                if k in self.loss_weight_dict:
+                    losses[k] *= self.loss_weight_dict[k]
+            #     else:
+            #         # remove this loss if not specified in `weight_dict`
+            #         losses.pop(k)
+            return losses
+        else:
+            
+            logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
+            processed_results = [{"sem_seg": logits[i], "uni_logits": outputs['uni_logits'][i]} for i in range(logits.shape[0])]
+
+            return processed_results                
 
     def env_init(self):
-        if self.proto_init == torch.zeros(1):
-            self.gnn_model.set_init_stage(False)
-            unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
-            self.proj_head.set_bipartite_graphs(bi_graphs)
-            self.proj_head.set_unify_prototype(unify_prototype, grad=False)
-            self.proto_init = torch.ones(1)
             
         if self.initial == False:
-            logger.info(f"initial: finetune_stage: {self.finetune_stage}, alter_iter:{self.alter_iters}")
+            logger.info(f"initial: finetune_stage: {self.finetune_stage}")
             self.backbone.req_grad(True)
             self.proj_head.req_grad(True)
             self.gnn_model.req_grad(False)
@@ -230,28 +211,13 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             self.gnn_model.eval()
             self.initial = True
 
-
-    def change_to_seg(self):
-        logger.info(f"change to seg_stage")
-        self.train_seg_or_gnn = self.SEG
-        self.backbone.req_grad(True)
-        self.proj_head.req_grad(True)
-        self.gnn_model.req_grad(False)
-        self.backbone.train()
-        self.proj_head.train()
-        self.gnn_model.eval() 
-        self.alter_iters = torch.zeros(1)
-
-    def change_to_gnn(self):
-        logger.info(f"change to gnn_stage")
-        self.train_seg_or_gnn = self.GNN
-        self.backbone.req_grad(False)
-        self.proj_head.req_grad(False)
-        self.gnn_model.req_grad(True)
-        self.backbone.eval()
-        self.proj_head.eval()
-        self.gnn_model.train()
-        self.alter_iters = torch.zeros(1)
+        if int(self.proto_init) == 0:
+            logger.info(f"initial: finetune_stage: {self.finetune_stage}")
+            self.gnn_model.set_init_stage(False)
+            unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
+            self.proj_head.set_bipartite_graphs(bi_graphs)
+            self.proj_head.set_unify_prototype(unify_prototype.detach().float(), grad=True)
+            self.proto_init.data = torch.ones(1)
                 
                     
 

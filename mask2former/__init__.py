@@ -23,6 +23,7 @@ from .data.dataset_mappers.semantic_dataset_mapper import SemanticDatasetMapper
 # models
 from .maskformer_model import MaskFormer
 from .HRNetv2_model import HRNet_W48_ARCH
+from .HRNetv2_model_finetune import HRNet_W48_Finetune_ARCH
 from .test_time_augmentation import SemanticSegmentorWithTTA
 
 # evaluation

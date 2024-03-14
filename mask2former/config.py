@@ -194,7 +194,7 @@ def add_gnn_config(cfg):
     cfg.MODEL.GNN.with_datasets_aux = True
     cfg.MODEL.GNN.init_stage_iters = 10000
     cfg.MODEL.GNN.isGumbelSoftmax = False
-    
+    cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS = 20000
     cfg.MODEL.GNN.GNN_ITERS = 20000
     cfg.MODEL.GNN.SEG_ITERS = 20000
     cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS = 15000

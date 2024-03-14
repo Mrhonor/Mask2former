@@ -12,7 +12,7 @@ from detectron2.layers import Conv2d
 
 from .position_encoding import PositionEmbeddingSine
 from .maskformer_transformer_decoder import TRANSFORMER_DECODER_REGISTRY
-
+from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
 
 class SelfAttentionLayer(nn.Module):
 
@@ -247,6 +247,9 @@ class GNNMaskedTransformerDecoder(nn.Module):
         pre_norm: bool,
         mask_dim: int,
         enforce_input_project: bool,
+        gnn_module,
+        datasets_cats,
+        num_unify_class
     ):
         """
         NOTE: this interface is experimental.
@@ -327,11 +330,18 @@ class GNNMaskedTransformerDecoder(nn.Module):
                 weight_init.c2_xavier_fill(self.input_proj[-1])
             else:
                 self.input_proj.append(nn.Sequential())
-
+                
+        self.n_datasets = len(datasets_cats)
+        self.total_cats = 0
+        self.datasets_cats = datasets_cats
+        for i in range(0, self.n_datasets):
+            self.total_cats += self.dataset_cats[i]
+        
+        self.num_unify_class = num_unify_class
         # output FFNs
         if self.mask_classification:
-            self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.mask_embed = MLP(hidden_dim, hidden_dim, mask_dim, 3)
+            self.class_embed = nn.Linear(hidden_dim, num_unify_class) # KL散度辅助监督
+        self.GNN_module = gnn_module
 
     @classmethod
     def from_config(cls, cfg, in_channels, mask_classification):
@@ -357,7 +367,9 @@ class GNNMaskedTransformerDecoder(nn.Module):
         ret["enforce_input_project"] = cfg.MODEL.MASK_FORMER.ENFORCE_INPUT_PROJ
 
         ret["mask_dim"] = cfg.MODEL.SEM_SEG_HEAD.MASK_DIM
-
+        ret["datasets_cats"] = cfg.DATASETS.DATASETS_CATS
+        ret["num_unify_classes"] = cfg.DATASETS.NUM_UNIFY_CLASS
+        ret["gnn_module"] = build_GNN_module(cfg)
         return ret
 
     def forward(self, x, mask_features, mask = None):
@@ -430,11 +442,12 @@ class GNNMaskedTransformerDecoder(nn.Module):
         }
         return out
 
-    def forward_prediction_heads(self, output, mask_features, attn_mask_target_size):
+    def forward_prediction_heads(self, output, mask_features, attn_mask_target_size, dataset_lbs):
         decoder_output = self.decoder_norm(output)
         decoder_output = decoder_output.transpose(0, 1)
-        outputs_class = self.class_embed(decoder_output)
-        mask_embed = self.mask_embed(decoder_output)
+        mask_embed, outputs_class = self.GNN_module(decoder_output, dataset_lbs=dataset_lbs)
+        # outputs_class = self.class_embed(decoder_output)
+        # mask_embed = self.mask_embed(decoder_output)
         outputs_mask = torch.einsum("bqc,bchw->bqhw", mask_embed, mask_features)
 
         # NOTE: prediction is of higher-resolution

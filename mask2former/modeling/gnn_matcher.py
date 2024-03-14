@@ -124,7 +124,8 @@ class GNNMatcher(nn.Module):
             # Compute the classification cost. Contrary to the loss, we don't use the NLL,
             # but approximate it in 1 - proba[target class].
             # The 1 is a constant that doesn't change the matching, it can be ommitted.
-            cost_class = -out_prob[:, tgt_ids]
+            cost_class = 1-out_prob[:, tgt_ids]
+            cost_no_object = 1-out_prob[:, -1]
 
             out_mask = outputs["pred_masks"][b]  # [num_queries, H_pred, W_pred]
             # gt masks are already padded when preparing target
@@ -162,7 +163,9 @@ class GNNMatcher(nn.Module):
                 + self.cost_class * cost_class
                 + self.cost_dice * cost_dice
             )
-            C = C.reshape(num_queries, -1).cpu()
+            C = C.reshape(num_queries, -1)
+            C = torch.cat([C, (self.cost_mask*2+self.cost_class+self.cost_dice) * cost_no_object], dim=1).cpu
+            
 
             indices.append(linear_sum_assignment(C))
 

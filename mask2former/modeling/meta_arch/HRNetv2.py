@@ -162,7 +162,7 @@ class HRNet_W48(nn.Module):
             
 
         self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
-                                requires_grad=False)
+                                requires_grad=True)
         trunc_normal_(self.unify_prototype, std=0.02)
         
         self.with_datasets_aux = with_datasets_aux
@@ -215,7 +215,7 @@ class HRNet_W48(nn.Module):
         emb = self.proj_head(feats)
 
         if self.training:
-            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
+            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.to(emb.dtype))
             remap_logits = []
             for i in range(self.n_datasets):
                 if not (dataset_ids == i).any():
@@ -226,7 +226,7 @@ class HRNet_W48(nn.Module):
                 cur_cat = 0
                 aux_logits = []
                 for i in range(self.n_datasets):
-                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb[dataset_ids==i], self.aux_prototype[i]))
+                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb[dataset_ids==i], self.aux_prototype[i].to(emb.dtype)))
                     cur_cat += self.datasets_cats[i]
                     
                 return {'logits':remap_logits, 'aux_logits':aux_logits, 'emb':emb}
@@ -234,7 +234,8 @@ class HRNet_W48(nn.Module):
             return {'logits':remap_logits, 'emb':emb}
         else:
             # logger.info(f'emb : dtype{emb.dtype}, unify_prototype : dtype{self.unify_prototype.dtype}')
-            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.float()) 
+            
+            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.to(emb.dtype)) 
             if not isinstance(dataset_ids, int):
                 remap_logits = []
                 for i in range(self.n_datasets):
@@ -243,7 +244,7 @@ class HRNet_W48(nn.Module):
                     remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
             else:
                 remap_logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset_ids])
-            return {'logits':remap_logits, 'emb':emb}
+            return {'logits':remap_logits, 'emb':emb, "uni_logits": logits}
 
     # return {'logits': emb}
 

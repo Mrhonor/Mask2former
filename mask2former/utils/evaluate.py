@@ -25,7 +25,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 from contextlib import ExitStack, contextmanager
 
-
+from detectron2.data import MetadataCatalog
 from detectron2.engine.hooks import HookBase
 import datetime
 from detectron2.utils.logger import log_every_n_seconds
@@ -471,7 +471,8 @@ def print_bipartite(datasets_cats, n_datasets, bi_graphs, total_cats, datasets_n
     
     total_buckets = [[] for _ in range(total_cats)]
     for i in range(0, n_datasets):
-        
+        meta = MetadataCatalog.get(datasets_name[i])
+        lb_name = meta.stuff_classes
         max_value, max_index = torch.max(bi_graphs[i], dim=0)
         n_cat = datasets_cats[i]
         
@@ -486,25 +487,26 @@ def print_bipartite(datasets_cats, n_datasets, bi_graphs, total_cats, datasets_n
             else:
                 buckets[int(j)].append(index)
             
-            total_buckets[index].append(eval(datasets_name[i]+'_lb')[int(j)])
+            total_buckets[index].append(lb_name[int(j)])
             
-        print("dataset {}:".format(datasets_name[i]))    
+        logger.info("dataset {}:".format(datasets_name[i]))    
     
         for index in range(0, n_cat):
             if index not in buckets:
                 buckets[index] = []
-            print("\"{}\": {}".format(eval(datasets_name[i]+'_lb')[index], buckets[index]))    
+            logger.info("\"{}\": {}".format(lb_name[index], buckets[index]))    
        
     for index in range(0, total_cats):
-        print("\"{}\": {}".format(index, total_buckets[index]))
+        logger.info("\"{}\": {}".format(index, total_buckets[index]))
     
     return 
 
 class find_unuse_hook(HookBase):
     def after_step(self):
-        if self.trainer.iter > self.trainer.cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS and self.trainer.model.finetune_stage == torch.ones(1):
+        if self.trainer.iter > self.trainer.cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS and int(self.trainer.model.finetune_stage) == 1:
             logger = logging.getLogger(__name__)
             model = self.trainer.model
+            model.finetune_stage = torch.zeros(1)
             bipart_graph = model.get_bipart_graph()
             callbacks = None
             ignore_label = 255
@@ -617,57 +619,57 @@ class find_unuse_hook(HookBase):
                         )
                     )
                 
-            max_value, max_index = torch.max(bipart_graph[dataset_id], dim=0)
-            # print(max_value)
-            
-            # torch.set_printoptions(profile="full")
-            # print(hist)
+                max_value, max_index = torch.max(bipart_graph[dataset_idx], dim=0)
+                # print(max_value)
+                
+                # torch.set_printoptions(profile="full")
+                # print(hist)
 
-            buckets = {}
-            for index, j in enumerate(max_index):
-                if max_value[index] == 0:
-                    continue
-                
-                if int(j) not in buckets:
-                    buckets[int(j)] = [index]
-                else:
-                    buckets[int(j)].append(index)
+                buckets = {}
+                for index, j in enumerate(max_index):
+                    if max_value[index] == 0:
+                        continue
+                    
+                    if int(j) not in buckets:
+                        buckets[int(j)] = [index]
+                    else:
+                        buckets[int(j)].append(index)
 
-            for index in range(0, n_classes):
-                if index not in buckets:
-                    logger.info(f'index not in buckets: {index}')
-                    buckets[index] = []
-
-            for index, val in buckets.items():
-                total_num = 0
-                for i in val:
-                    total_num += hist[index][i]
-                new_val = []
-                if total_num != 0:
-                    for i in val:
-                        rate = hist[index][i] / total_num
-                        if rate > 0.1:
-                            # new_val.append([i, rate])
-                            new_val.append(i)
-                else:
-                    for i in val:
-                        # new_val.append([i, 0])
-                        new_val.append(i)
-                
-                buckets[index] = new_val
-                
-                
                 for index in range(0, n_classes):
                     if index not in buckets:
+                        logger.info(f'index not in buckets: {index}')
                         buckets[index] = []
-                    print("\"{}\": {}".format(index, buckets[index]))    
-                
-                loaded_map[f'dataset{i+1}'] = buckets
+
+                for index, val in buckets.items():
+                    total_num = 0
+                    for i in val:
+                        total_num += hist[index][i]
+                    new_val = []
+                    if total_num != 0:
+                        for i in val:
+                            rate = hist[index][i] / total_num
+                            if rate > 0.1:
+                                # new_val.append([i, rate])
+                                new_val.append(i)
+                    else:
+                        for i in val:
+                            # new_val.append([i, 0])
+                            new_val.append(i)
+                    
+                    buckets[index] = new_val
+                    
+                    
+                    for index in range(0, n_classes):
+                        if index not in buckets:
+                            buckets[index] = []
+                        print("\"{}\": {}".format(index, buckets[index]))    
+                    
+                    loaded_map[f'dataset{dataset_idx}'] = buckets
 
             bi_graphs = []
             for dataset_id in range(0, n_datasets):
                 n_cats = datasets_cats[dataset_id]
-                this_bi_graph = torch.zeros(n_cats, total_cats)
+                this_bi_graph = torch.zeros(n_cats, num_unfiy_class)
                 for key, val in loaded_map['dataset'+str(dataset_id)].items():
                     this_bi_graph[int(key)][val] = 1
                     
@@ -678,7 +680,7 @@ class find_unuse_hook(HookBase):
 class eval_link_hook(HookBase):
     @torch.no_grad()
     def after_step(self):
-        if self.trainer.iter % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN and not self.trainer.model.init_gnn_stage:
+        if (self.trainer.iter+1) % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN and not self.trainer.model.init_gnn_stage:
             logger = logging.getLogger(__name__)
             logger.info(f"eval link at iteration {self.trainer.iter}!")
             # org_aux = net.aux_mode

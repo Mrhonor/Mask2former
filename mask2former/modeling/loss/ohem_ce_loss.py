@@ -26,7 +26,7 @@ class OhemCELoss(nn.Module):
         loss = self.criteria(logits, labels).view(-1)
         
         # print(torch.max(loss))
-        loss_hard = loss[loss > self.thresh]
+        loss_hard = loss[loss > self.thresh.to(logits.dtype)]
         if loss_hard.numel() < n_min:
             loss_hard, _ = loss.topk(n_min)
         
@@ -57,7 +57,11 @@ class MdsOhemCELoss(nn.Module):
             if not (dataset_ids == i).any():
                 continue
             # loss = self.criterias[i](logits[cur_index], labels[dataset_ids==i]).view(-1)
-            loss = self.criteria(logits[cur_index], labels[dataset_ids==i]).view(-1)
+            this_logit = logits[cur_index]
+            this_label = labels[dataset_ids==i]
+            if this_logit.shape[2] != this_label.shape[2]:
+                this_logit = F.interpolate(this_logit, size=(this_label.shape[2], this_label.shape[3]), mode="bilinear", align_corners=True)
+            loss = self.criteria(this_logit, this_label).view(-1)
             loss_hard = loss[loss > self.thresh]
 
             cur_index+=1
@@ -86,7 +90,7 @@ class MdsOhemCELoss(nn.Module):
         #         ret += torch.mean(loss_hard[i])
             # print("loss_hard[{}].mean: ".format(i), torch.mean(loss_hard[i]))
         
-        return torch.mean(loss_hard)
+        return {'loss_ce': torch.mean(loss_hard)}
 
     
 if __name__ == '__main__':

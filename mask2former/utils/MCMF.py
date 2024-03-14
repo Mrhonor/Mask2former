@@ -14,7 +14,7 @@ class Edge:
         self.dis = dis  # 花费
         self.from_ = from_
 
-class MinCostMaxFlow(nn.module):
+class MinCostMaxFlow(nn.Module):
     """最小费用最大流算法类"""
     def __init__(self, n_classes, uni_classes, n_points=12544, ignore_lb=255):
         self.uni_classes = uni_classes
@@ -152,7 +152,7 @@ class MinCostMaxFlow(nn.module):
 
         return self.pre[t] != -1
 
-    def forword(self, unify_logits, target, bipart):
+    def forward(self, unify_logits, target, bipart):
         self.construct_edges(unify_logits, target, bipart)
         """最小费用最大流算法"""
         while self.spfa(self.s, self.t):
