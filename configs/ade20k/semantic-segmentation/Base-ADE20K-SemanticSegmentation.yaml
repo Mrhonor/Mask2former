@@ -15,7 +15,7 @@ MODEL:
     RES5_MULTI_GRID: [1, 1, 1]  # not used
 DATASETS:
   TRAIN: ("ade_sem_seg_train",)
-  TEST: ("ade_sem_seg_val",)
+  TEST: ("ade_sem_seg_train",)
 SOLVER:
   IMS_PER_BATCH: 16
   BASE_LR: 0.0001

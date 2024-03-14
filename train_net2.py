@@ -62,7 +62,8 @@ from mask2former import (
     add_hrnet_config,
     add_gnn_config,
     DaLiLoaderAdapter,
-    LoaderAdapter
+    LoaderAdapter,
+    build_bipartite_graph_for_unseen
 )
 
 from PIL import Image
@@ -76,12 +77,13 @@ import logging
 from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook
 
 
+logger = logging.getLogger(__name__)
 def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None, size_divisibility=-1, ignore_label=255):
-    # logger = logging.getLogger(__name__)
     with PathManager.open(filename, "rb") as f:
         image = np.array(Image.open(f), copy=False, dtype=dtype)
         if lb_map is not None:
             image = lb_map[image] 
+
     #     logger.info(f'size_divisibility: {size_divisibility}')
     #     if size_divisibility > 0:
     #         image = torch.tensor(image)
@@ -118,6 +120,7 @@ class Trainer(DefaultTrainer):
         evaluator manually in your script and do not have to worry about the
         hacky if-else logic here.
         """
+        logger.info(f"build evaluator:{dataset_name}")
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
         evaluator_list = []
@@ -128,7 +131,7 @@ class Trainer(DefaultTrainer):
             lookup_table = MetadataCatalog.get(dataset_name).thing_dataset_id_to_contiguous_id
             for k, v in lookup_table.items():
                 lb_map[k] = v
-            
+            logger.info(f"evaluator_type:{dataset_name}")
             evaluator_list.append(
                 SemSegEvaluator(
                     dataset_name,
@@ -381,25 +384,36 @@ def setup(args):
     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask2former")
     return cfg
 
+def build_bipart_for_unseen(cfg, model):
+    """
+    Build bipartite graph for unseen classes.
+    """
+    from mask2former.utils import build_bipartite_graph_for_unseen
+    build_bipartite_graph_for_unseen(cfg, model)
+    
 
 def main(args):
     cfg = setup(args)
-
+    
     if args.eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
+        
+        # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
+        
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
         if comm.is_main_process():
             verify_results(cfg, res)
         return res
-
+    
     trainer = Trainer(cfg)
     # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
-    trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
+    # trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
+    trainer.register_hooks([iter_info_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

@@ -1,4 +1,4 @@
-_BASE_: Base-Cityscapes-SemanticSegmentation_hrnet.yaml
+_BASE_: Base-coco-SemanticSegmentation_hrnet.yaml
 MODEL:
   META_ARCHITECTURE: "HRNet_W48_ARCH"
   SEM_SEG_HEAD:

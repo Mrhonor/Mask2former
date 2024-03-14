@@ -1,6 +1,6 @@
 _BASE_: Base-Cityscapes-SemanticSegmentation_gnn.yaml
 MODEL:
-  META_ARCHITECTURE: "HRNet_W48_ARCH"
+  META_ARCHITECTURE: "HRNet_W48_Finetune_ARCH"
   PRETRAINING: False
   SEM_SEG_HEAD:
     NAME: "HRNet_W48"

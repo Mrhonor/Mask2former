@@ -2,7 +2,6 @@
 # -*- encoding: utf-8 -*-
 
 
-from email.policy import strict
 import sys
 
 sys.path.insert(0, '.')
@@ -738,17 +737,19 @@ class eval_link_hook(HookBase):
                             start_eval_time = time.perf_counter()
                             labels = [x["sem_seg"][None].cuda() for x in inputs]
 
-                            logits = [output["uni_logits"][None] for output in outputs]
+                            logits = [output["uni_logits"] for output in outputs]
                             
                             for lb, lg in zip(labels, logits):
+                                # logger.info(f"lb:{lb.shape}, lg:{lg.shape}")
 
                                 lb = F.interpolate(lb.unsqueeze(1).float(), size=(lg.shape[2], lg.shape[3]),
                                         mode='nearest').squeeze(1).long()
 
                                 probs = torch.softmax(lg, dim=1)
                                 preds = torch.argmax(probs, dim=1)
-                                                   
+                                logger = logging.getLogger(__name__) 
                                 keep = lb != ignore_label
+                                # logger.info(f"lb:{lb.shape}, keep:{keep.shape}, preds:{preds.shape}")
 
                                 hist += torch.tensor(np.bincount(
                                     lb.cpu().numpy()[keep.cpu().numpy()] * num_unfiy_class + preds.cpu().numpy()[keep.cpu().numpy()],

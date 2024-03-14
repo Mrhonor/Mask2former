@@ -8,6 +8,7 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone, build_sem_se
 from detectron2.modeling.backbone import Backbone
 from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.modeling.postprocessing import sem_seg_postprocess
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
 from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
@@ -163,21 +164,17 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         features = self.backbone(images.tensor)
         outputs = self.proj_head(features, dataset_lbs)
         
-
         if self.training:
                         # bipartite matching-based loss
             remap_logits = outputs['logits']
-
             if self.with_datasets_aux:
                 aux_logits_out = outputs['aux_logits']
             losses = {}
-
+            self.alter_iters += 1
             for id, logit in enumerate(remap_logits):
                 logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-            
                 loss = self.criterion(logits, targets[dataset_lbs==id])
                 losses[f'loss_ce{id}'] = loss
-
             
             if self.with_datasets_aux:
                 for idx, aux_logits in enumerate(aux_logits_out):
@@ -186,20 +183,32 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                     aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
                     losses[f'loss_aux{idx}'] = aux_loss
             for k in list(losses.keys()):
-                if k in self.loss_weight_dict:
-                    losses[k] *= self.loss_weight_dict[k]
+                if k in self.criterion.weight_dict:
+                    losses[k] *= self.criterion.weight_dict[k]
             #     else:
             #         # remove this loss if not specified in `weight_dict`
             #         losses.pop(k)
             return losses
         else:
-            
-            logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
-            processed_results = [{"sem_seg": logits[i], "uni_logits": outputs['uni_logits'][i]} for i in range(logits.shape[0])]
-
-            return processed_results                
+            processed_results = []
+            for logit, input_per_image, image_size, uni_logits in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
+                height = input_per_image.get("height", image_size[0])
+                width = input_per_image.get("width", image_size[1])
+                logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
+                # logger.info(f"logit shape:{logit.shape}")
+                processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
+            return processed_results             
 
     def env_init(self):
+        if int(self.proto_init) == 0:
+            self.gnn_model.set_init_stage(False)
+            unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
+            self.proj_head.set_bipartite_graphs(bi_graphs)
+            self.proj_head.set_unify_prototype(unify_prototype, grad=False)
+            self.proto_init = torch.ones(1)
             
         if self.initial == False:
             logger.info(f"initial: finetune_stage: {self.finetune_stage}")

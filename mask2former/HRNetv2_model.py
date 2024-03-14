@@ -8,6 +8,9 @@ from detectron2.modeling import META_ARCH_REGISTRY, build_backbone, build_sem_se
 from detectron2.modeling.backbone import Backbone
 from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.modeling.postprocessing import sem_seg_postprocess
+
+
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
 from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
@@ -20,6 +23,7 @@ import numpy as np
 import torch.utils.model_zoo as model_zoo
 import threading
 from .utils.MCMF import MinCostMaxFlow
+from .utils.MCMF_ortools import MinCostMaxFlow_Or
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +33,16 @@ class MCMFThread(threading.Thread):
         self.unify_logits = unify_logits
         self.target = target
         self.bipart = bipart
+        self.ret = None
         uni_classes = unify_logits.shape[1]
-        self.MCMF = MinCostMaxFlow(n_classes, uni_classes, n_points, ignore_lb)
+        self.MCMF = MinCostMaxFlow_Or(n_classes, uni_classes, n_points, ignore_lb)
         # self.lb_map=lb_map
         # self.trans_func = trans_func
         
 
     def run(self, ):
         # 在这里执行图像读取操作
-        self.ret = self.MCMF(self.unify_logits, self.target, self.bipart)
+        self.ret = self.MCMF(self.unify_logits, self.target, self.bipart).to(self.unify_logits.device).long()
 
 
 @META_ARCH_REGISTRY.register()
@@ -67,7 +72,8 @@ class HRNet_W48_ARCH(nn.Module):
                 with_spa_loss,
                 loss_weight_dict,
                 with_orth_loss,
-                with_adj_loss
+                with_adj_loss,
+                n_points,
                 ):
         super(HRNet_W48_ARCH, self).__init__()
         self.num_unify_classes = num_unify_classes
@@ -109,6 +115,7 @@ class HRNet_W48_ARCH(nn.Module):
         self.criterion = OhemCELoss(ohem_thresh, ignore_lb)
         self.MdsOhemLoss = MdsOhemCELoss(ohem_thresh, ignore_lb)
         self.celoss = nn.CrossEntropyLoss(ignore_index=ignore_lb)
+        self.ignore_lb = ignore_lb
         
         # 初始化 grad
         self.initial = False
@@ -127,6 +134,7 @@ class HRNet_W48_ARCH(nn.Module):
         self.MSE_sum_loss = torch.nn.MSELoss(reduction='sum')
         self.init_gnn_stage = False
         self.target_bipart = None
+        self.n_points = n_points
         # self.backbone.load_state_dict( model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth"), strict=False)
   
 
@@ -135,8 +143,8 @@ class HRNet_W48_ARCH(nn.Module):
     @classmethod
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
-        sem_seg_head = build_sem_seg_head(cfg, 720)
-        # sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
+        # sem_seg_head = build_sem_seg_head(cfg, 720)
+        sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
         gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
@@ -153,6 +161,7 @@ class HRNet_W48_ARCH(nn.Module):
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
         with_orth_loss = cfg.LOSS.WITH_ORTH_LOSS  
         with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
+        n_points = cfg.MODEL.GNN.N_POINTS
         loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 1, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 1, "loss_aux6": 1, "loss_spa": 0.01, "loss_adj":1, "loss_orth":10}
         
         return {
@@ -176,7 +185,8 @@ class HRNet_W48_ARCH(nn.Module):
             "with_spa_loss": with_spa_loss,
             "with_orth_loss": with_orth_loss,
             "with_adj_loss": with_adj_loss,
-            "loss_weight_dict": loss_weight_dict
+            "loss_weight_dict": loss_weight_dict,
+            "n_points": n_points
         }
 
 
@@ -194,14 +204,13 @@ class HRNet_W48_ARCH(nn.Module):
         #     targets = batched_inputs['sem_seg'].cuda()
         #     features = self.backbone(images)  
         # else:
-
         
         images = [x["image"].cuda() for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
-        if self.training:
-            images = ImageList.from_tensors(images, self.size_divisibility)
-        else:
-            images = ImageList.from_tensors(images, -1)
+        # if self.training:
+        # images = ImageList.from_tensors(images, 4)#self.size_divisibility)
+        # else:
+        images = ImageList.from_tensors(images, -1)
         targets = [x["sem_seg"].cuda() for x in batched_inputs]
         targets = self.prepare_targets(targets, images)
         targets = torch.cat(targets, dim=0)
@@ -230,9 +239,15 @@ class HRNet_W48_ARCH(nn.Module):
                 #         losses.pop(k)
                 return losses
             else:
-                
-                logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
-                processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+                processed_results = []
+                for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                    height = input_per_image.get("height", image_size[0])
+                    width = input_per_image.get("width", image_size[1])
+                    logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    
+                    logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                    # logger.info(f"logit shape:{logit.shape}")
+                    processed_results.append({"sem_seg": logit})
                 return processed_results
         else:
             self.env_init(self.iters)
@@ -243,7 +258,7 @@ class HRNet_W48_ARCH(nn.Module):
                 outputs = self.proj_head(features, dataset_lbs)
                 unify_prototype, bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
                 self.alter_iters += 1
-                losses = self.calc_loss(images, targets, dataset_lbs, outputs, unify_prototype, bi_graphs)
+                losses = self.calc_loss(images, targets, dataset_lbs, outputs, unify_prototype, bi_graphs, batched_inputs)
                     
                 for k in list(losses.keys()):
                     if k in self.loss_weight_dict:
@@ -258,8 +273,14 @@ class HRNet_W48_ARCH(nn.Module):
                 outputs = self.proj_head(features, dataset_lbs)
                 unify_prototype, bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
                 if self.train_seg_or_gnn == self.SEG:
-                    logits = F.interpolate(outputs['logits'], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    processed_results = [{"sem_seg": logits[i]} for i in range(logits.shape[0])]
+                    processed_results = []
+                    for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                        height = input_per_image.get("height", image_size[0])
+                        width = input_per_image.get("width", image_size[1])
+                        logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                        logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                        # logger.info(f"logit shape:{logit.shape}")
+                        processed_results.append({"sem_seg": logit})
                 else:
                     if self.with_datasets_aux:
                         ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
@@ -269,10 +290,18 @@ class HRNet_W48_ARCH(nn.Module):
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[2*dataset_lbs])
                     else:
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[dataset_lbs])
-                    logits = F.interpolate(logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    processed_results = []
+                    for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
+                        height = input_per_image.get("height", image_size[0])
+                        width = input_per_image.get("width", image_size[1])
+                        logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                        
+                        logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                        # logger.info(f"logit shape:{logit.shape}")
+                        processed_results.append({"sem_seg": logit, "uni_logits": ori_logits})
+                    
+                return processed_results                
 
-                    processed_results = [{"sem_seg": logits[i], "uni_logits": ori_logits[i]} for i in range(logits.shape[0])]
-                return processed_results 
 
     def clac_pretrain_loss(self, batched_inputs, images, targets, dataset_lbs, outputs):
         losses = {}
@@ -319,19 +348,27 @@ class HRNet_W48_ARCH(nn.Module):
                             
                     remap_logits_2 = F.interpolate(remap_logits_2, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     loss_2 = self.criterion(remap_logits_2, targets[dataset_lbs==i])
-                    losses[f'loss_ce{i}'] = uot_rate*loss_1 + adj_rate*loss_2
+                    loss = uot_rate*loss_1 + adj_rate*loss_2
+                    if torch.isnan(loss):
+                        logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                    else:
+                        losses[f'loss_ce{i}'] = loss
                 else:
                     remap_logits = torch.einsum('bchw, nc -> bnhw', logits[dataset_lbs==i], bi_graphs[i])
                         
                     remap_logits = F.interpolate(remap_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     loss = self.criterion(remap_logits, targets[dataset_lbs==i])
-                            
-                    losses[f'loss_ce{i}'] = loss
+                    if torch.isnan(loss):
+                        logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                    else:
+                        losses[f'loss_ce{i}'] = loss
             else:
                 remap_logits[i] = F.interpolate(remap_logits[i], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 loss = self.criterion(remap_logits[i], targets[dataset_lbs==i])
-                        
-                losses[f'loss_ce{i}'] = loss                        
+                if torch.isnan(loss):
+                    logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                else:
+                    losses[f'loss_ce{i}'] = loss                   
             
 
             if self.with_datasets_aux:
@@ -342,7 +379,10 @@ class HRNet_W48_ARCH(nn.Module):
                         
                 aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 aux_loss = self.criterion(aux_logits, targets[dataset_lbs==i])
-                losses[f'loss_aux{i}'] = aux_loss
+                if torch.isnan(aux_loss):
+                    logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                else:
+                    losses[f'loss_aux{i}'] = aux_loss
                     
 
                     
@@ -619,7 +659,7 @@ class HRNet_W48_ARCH(nn.Module):
 
         return loss
     
-    def calc_match_loss(self, images, targets, dataset_lbs, outputs, unify_prototype, bi_graphs):
+    def calc_match_loss(self, images, targets, dataset_lbs, outputs, unify_prototype, bi_graphs, batched_inputs):
         losses = {}
         if self.train_seg_or_gnn == self.GNN:
             if self.with_datasets_aux:
@@ -632,8 +672,8 @@ class HRNet_W48_ARCH(nn.Module):
                 aux_logits_out = outputs['aux_logits']
                     
         
-        if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and self.iters > self.init_gnn_iters:
-            self.start_multi_thread_mcmf(logits, targets, bi_graphs, dataset_lbs)
+        # if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and self.iters > self.init_gnn_iters:
+        #     self.start_multi_thread_mcmf(logits, targets, bi_graphs, dataset_lbs)
             
                 # remap_logits = []
         uot_rate = np.min([int(self.alter_iters) / self.first_stage_gnn_iters, 1])
@@ -655,20 +695,30 @@ class HRNet_W48_ARCH(nn.Module):
                             
                     remap_logits_2 = F.interpolate(remap_logits_2, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     loss_2 = self.criterion(remap_logits_2, targets[dataset_lbs==i])
-                    losses[f'loss_ce{i}'] = uot_rate*loss_1 + adj_rate*loss_2
+                    loss = uot_rate*loss_1 + adj_rate*loss_2
+                    if torch.isnan(loss):
+                        logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                    else:
+                        losses[f'loss_ce{i}'] = loss
                 else:
                     remap_logits = torch.einsum('bchw, nc -> bnhw', logits[dataset_lbs==i], bi_graphs[i])
                         
                     remap_logits = F.interpolate(remap_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     loss = self.criterion(remap_logits, targets[dataset_lbs==i])
                             
-                    losses[f'loss_ce{i}'] = loss
+                    if torch.isnan(loss):
+                        logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                    else:
+                        losses[f'loss_ce{i}'] = loss
             else:
                 remap_logits[i] = F.interpolate(remap_logits[i], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 loss = self.criterion(remap_logits[i], targets[dataset_lbs==i])
                         
-                losses[f'loss_ce{i}'] = loss                        
-            
+                if torch.isnan(loss):
+                    logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                else:
+                    losses[f'loss_ce{i}'] = loss                    
+        
 
             if self.with_datasets_aux:
                 if self.train_seg_or_gnn == self.GNN:
@@ -678,7 +728,11 @@ class HRNet_W48_ARCH(nn.Module):
                         
                 aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 aux_loss = self.criterion(aux_logits, targets[dataset_lbs==i])
-                losses[f'loss_aux{i}'] = aux_loss
+                if torch.isnan(aux_loss):
+                    logger.info(f"file_name:{batched_inputs[2*i]['file_name']}, {torch.min(targets[dataset_lbs==i])}")
+                    
+                else:
+                    losses[f'loss_aux{i}'] = aux_loss
                     
 
                     
@@ -698,23 +752,24 @@ class HRNet_W48_ARCH(nn.Module):
                 losses['loss_orth'] = self.similarity_dsb(unify_prototype)               
         
         if self.with_adj_loss and self.train_seg_or_gnn == self.GNN and self.inFirstGNNStage and self.iters > self.init_gnn_iters:
-            supervise_bi = self.start_multi_thread_mcmf()
-            cur_idx = 0
-            for i in range(self.n_datasets):
-                if not (dataset_lbs == i).any():
-                    continue
-                if len(bi_graphs) == 2*self.n_datasets:
-                    if 'loss_adj' not in losses:
-                        losses['loss_adj'] = self.celoss(bi_graphs[2*i+1].T, supervise_bi[cur_idx])
-                    else:
-                        losses['loss_adj'] += self.celoss(bi_graphs[2*i+1].T, supervise_bi[cur_idx])
-                else:
-                    if 'loss_adj' not in losses:
-                        losses['loss_adj'] = self.celoss(bi_graphs[i].T, supervise_bi[cur_idx])
-                    else:
-                        losses['loss_adj'] += self.celoss(bi_graphs[i].T, supervise_bi[cur_idx])
+            self.clac_mcmf(logits, targets, bi_graphs, dataset_lbs, losses)
+            # supervise_bi = self.get_multi_thread_mcmf()
+            # cur_idx = 0
+            # for i in range(self.n_datasets):
+            #     if not (dataset_lbs == i).any():
+            #         continue
+            #     if len(bi_graphs) == 2*self.n_datasets:
+            #         if 'loss_adj' not in losses:
+            #             losses['loss_adj'] = self.celoss(bi_graphs[2*i+1].T, supervise_bi[cur_idx])
+            #         else:
+            #             losses['loss_adj'] += self.celoss(bi_graphs[2*i+1].T, supervise_bi[cur_idx])
+            #     else:
+            #         if 'loss_adj' not in losses:
+            #             losses['loss_adj'] = self.celoss(bi_graphs[i].T, supervise_bi[cur_idx])
+            #         else:
+            #             losses['loss_adj'] += self.celoss(bi_graphs[i].T, supervise_bi[cur_idx])
                     
-                cur_idx += 1
+            #     cur_idx += 1
     
         return losses
         
@@ -733,7 +788,38 @@ class HRNet_W48_ARCH(nn.Module):
         for thread in self.threads:
             thread.start()
 
-   
+    def clac_mcmf(self, unify_logits, target, bipart, dataset_lbs, losses):
+        for i in range(self.n_datasets):
+            if not (dataset_lbs == i).any():
+                continue
+            uni_classes = unify_logits.shape[1]
+            mcmf = MinCostMaxFlow_Or(self.datasets_cats[i], uni_classes, n_points=self.n_points, ignore_lb=self.ignore_lb)
+            if len(bipart) == 2*self.n_datasets:
+                supervise_bi = mcmf(unify_logits[dataset_lbs == i], target[dataset_lbs == i], bipart[2*i+1]).to(unify_logits.device).long()
+            else:
+                supervise_bi = mcmf(unify_logits[dataset_lbs == i], target[dataset_lbs == i], bipart[i]).to(unify_logits.device).long()
+            
+            
+                
+            if len(bipart) == 2*self.n_datasets:
+                if 'loss_adj' not in losses:
+                    loss = self.celoss(bipart[2*i+1].T, supervise_bi)
+                    if not torch.isnan(loss):
+                        losses['loss_adj'] = loss
+                else:
+                    loss = self.celoss(bipart[2*i+1].T, supervise_bi)
+                    if not torch.isnan(loss):
+                        losses['loss_adj'] += loss
+            else:
+                if 'loss_adj' not in losses:
+                    loss = self.celoss(bipart[i].T, supervise_bi)
+                    if not torch.isnan(loss):
+                        losses['loss_adj'] = loss
+                else:
+                    loss = self.celoss(bipart[i].T, supervise_bi)
+                    if not torch.isnan(loss):
+                        losses['loss_adj'] += loss
+                
 
     def get_multi_thread_mcmf(self):
             # 等待所有线程完成
@@ -744,6 +830,6 @@ class HRNet_W48_ARCH(nn.Module):
         for thread in self.threads:
             rets.append(thread.ret)
         
-        
+        # logger.info(f"rets{rets}")
 
         return rets

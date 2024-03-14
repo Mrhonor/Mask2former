@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from detectron2.projects.point_rend.point_features import point_sample
@@ -14,11 +13,10 @@ class Edge:
         self.dis = dis  # 花费
         self.from_ = from_
 
-class MinCostMaxFlow(nn.Module):
+class MinCostMaxFlow:
     """最小费用最大流算法类"""
-    def __init__(self, n_classes, uni_classes, n_points=12544, ignore_lb=255):
-        super(MinCostMaxFlow, self).__init__()
-        self.uni_classes = uni_classes
+    def __init__(self, n_classes, unify_logits, target, bipart, n_points=12544, ignore_lb=255):
+        self.uni_classes = unify_logits.shape[1]
         n = n_classes + self.uni_classes + 2
         m = n_classes + self.uni_classes + 5 * n_classes 
         s = 0
@@ -39,33 +37,31 @@ class MinCostMaxFlow(nn.Module):
         self.m = m  # 边数
         self.s = s  # 源点
         self.t = t  # 汇点        
-
+        self.unify_logits = unify_logits
+        self.target = target
         self.num_points = n_points
         self.n_classes = n_classes
-        
-        self.bceloss = torch.nn.BCEWithLogitsLoss(reduction='none') #torch.nn.BCELoss(reduction='none')
+        self.bipart = bipart
+        self.bceloss = torch.nn.BCELoss(reduction='none')
         self.ignore_lb = ignore_lb
-        
+        self.construct_edges()
     
-    def construct_edges(self, unify_logits, target, bipart):
-        bs = unify_logits.shape[0]
-        # unify_logits = unify_logits
-        # target = target
-        # bipart = bipart
+    def construct_edges(self):
+        bs = self.unify_logits.shape[0]
 
-        point_coords = torch.rand(1, self.num_points, 2, device=unify_logits.device, dtype=unify_logits.dtype)
+        point_coords = torch.rand(1, self.num_points, 2, device=self.unify_logits.device)
         # get gt labels
         tgt_mask = point_sample(
-            target.unsqueeze(1).to(unify_logits.dtype),
-            point_coords.repeat(target.shape[0], 1, 1),
+            self.target.unsqueeze(1).float(),
+            point_coords.repeat(self.target.shape[0], 1, 1),
             padding_mode='reflection',
             mode='nearest'
         ).squeeze(1)  #.view(-1)
         
 
         out_mask = point_sample(
-            unify_logits,
-            point_coords.repeat(target.shape[0], 1, 1),
+            self.unify_logits,
+            point_coords.repeat(self.target.shape[0], 1, 1),
             align_corners=False,
             padding_mode='reflection'
         )
@@ -76,13 +72,13 @@ class MinCostMaxFlow(nn.Module):
             tgt = tgt_mask == i
             if not tgt.any():
                 continue
-            tgt = tgt.to(unify_logits.dtype)
-            losses = self.bceloss(out_mask.view(-1, self.num_points)[None], tgt.repeat(1, self.uni_classes, 1))
+            tgt = tgt.float()
+            losses = self.bceloss(out_mask, tgt.repeat(1, self.uni_classes, 1))
             
             costs = []
             for j in range(self.uni_classes):
                 loss = torch.mean(losses[:, j, :])
-                cost = (1-bipart[i, j]) + loss
+                cost = (1-self.bipart[i, j]) + loss
                 costs.append(cost)
             values, indexs = torch.tensor(costs).topk(5, largest=False)
             self.link_num += 5
@@ -153,8 +149,7 @@ class MinCostMaxFlow(nn.Module):
 
         return self.pre[t] != -1
 
-    def forward(self, unify_logits, target, bipart):
-        self.construct_edges(unify_logits, target, bipart)
+    def mcmf(self):
         """最小费用最大流算法"""
         while self.spfa(self.s, self.t):
             now = self.t

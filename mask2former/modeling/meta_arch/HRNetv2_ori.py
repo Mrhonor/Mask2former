@@ -113,7 +113,7 @@ class ProjectionHead(nn.Module):
         return feat
 
 @SEM_SEG_HEADS_REGISTRY.register()
-class HRNet_W48(nn.Module):
+class HRNet_W48_Ori(nn.Module):
     """
     deep high-resolution representation learning for human pose estimation, CVPR2019
     """
@@ -127,7 +127,7 @@ class HRNet_W48(nn.Module):
                 bn_type,
                 input_shape,
                 configer):
-        super(HRNet_W48, self).__init__()
+        super(HRNet_W48_Ori, self).__init__()
         self.aux_mode = aux_mode
         # self.num_unify_classes = num_unify_classes')
         self.datasets_cats = datasets_cats
@@ -162,7 +162,7 @@ class HRNet_W48(nn.Module):
             
 
         self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
-                                requires_grad=True)
+                                requires_grad=False)
         trunc_normal_(self.unify_prototype, std=0.02)
         
         self.with_datasets_aux = with_datasets_aux
@@ -213,105 +213,7 @@ class HRNet_W48(nn.Module):
 
         feats = torch.cat([feat1, feat2, feat3, feat4], 1)
         emb = self.proj_head(feats)
-
-        if self.training:
-            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.to(emb.dtype))
-            remap_logits = []
-            for i in range(self.n_datasets):
-                if not (dataset_ids == i).any():
-                    continue
-                remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
-            
-            if self.with_datasets_aux:
-                cur_cat = 0
-                aux_logits = []
-                for i in range(self.n_datasets):
-                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb[dataset_ids==i], self.aux_prototype[i].to(emb.dtype)))
-                    cur_cat += self.datasets_cats[i]
-                    
-                return {'logits':remap_logits, 'aux_logits':aux_logits, 'emb':emb}
-            
-            return {'logits':remap_logits, 'emb':emb}
-        else:
-            # logger.info(f'emb : dtype{emb.dtype}, unify_prototype : dtype{self.unify_prototype.dtype}')
-            
-            logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.to(emb.dtype)) 
-            if not isinstance(dataset_ids, int):
-                remap_logits = []
-                for i in range(self.n_datasets):
-                    if not (dataset_ids == i).any():
-                        continue
-                    remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
-            else:
-                remap_logits = [torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset_ids])]
-                
-            return {'logits':remap_logits, 'emb':emb, 'uni_logits':logits[None]}
-
-    # return {'logits': emb}
-
-        # if self.aux_mode == 'train':
-        #     # if self.training:
-        #     #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-                
-        #     #     if self.with_datasets_aux:
-        #     #         cur_cat = 0
-        #     #         aux_logits = []
-        #     #         for i in range(self.n_datasets):
-        #     #             aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb, self.aux_prototype[i]))
-        #     #             cur_cat += self.datasets_cats[i]
-                        
-        #     #         return {'seg':logits, 'aux':aux_logits}
-                
-        #     #     return {'seg':logits}
-        #     # else:
-        #     return {'seg':emb}
-        # elif self.aux_mode == 'eval':
-
-        #     # cur_cat=0
-        #     # for i in range(0, dataset):
-        #     #     cur_cat += self.datasets_cats[i]
-            
-        #     # logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[cur_cat:cur_cat+self.datasets_cats[dataset]])   
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # return logits
-        #     remap_logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     return remap_logits
-        # elif self.aux_mode == 'pred':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset][:self.datasets_cats[dataset]-1])
-        #     logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     logits = F.interpolate(logits, size=(logits.size(2)*4, logits.size(3)*4), mode="bilinear", align_corners=True)
-            
-        #     pred = logits.argmax(dim=1)
-            
-        #     return pred
-        # elif self.aux_mode == 'clip':
-        #     cur_cat=0
-        #     for i in range(0, dataset):
-        #         cur_cat += self.datasets_cats[i]
-            
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[cur_cat:cur_cat+self.datasets_cats[dataset]])   
-        #     return logits
-        # elif self.aux_mode == 'uni_eval':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     return logits
-        # elif self.aux_mode == 'unseen':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-
-        #     max_index = torch.argmax(logits, dim=1)
-        #     temp = torch.eye(logits.size(1)).cuda()
-        #     one_hot = temp[max_index]
-        #     remap_logits = torch.einsum('bhwc, nc -> bnhw', one_hot, self.bipartite_graphs[dataset])
-        #     return remap_logits
-            
-        # else:
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     logits = F.interpolate(logits, size=(logits.size(2)*4, logits.size(3)*4), mode="bilinear", align_corners=True)
-            
-        #     pred = logits.argmax(dim=1)
-            
-        #     return pred
+        return {'logits':emb[None]}
 
     def req_grad(self, isFrooze):
         for name, param in self.named_parameters():

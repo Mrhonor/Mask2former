@@ -575,6 +575,7 @@ class HighResolutionNet(Backbone):
         self.full_res_stem = cfg.MODEL.HRNET.FULL_RES_STEM
         HRNet_cfg = cfg.MODEL.HRNET.HRNET_CFG
         self.cfg = MODEL_CONFIGS[HRNet_cfg]
+        self.num_features = 720
 
         bn_type = cfg.MODEL.HRNET.BN_TYPE
         bn_momentum = 0.1
@@ -664,9 +665,9 @@ class HighResolutionNet(Backbone):
             elif name.find('affine_bias') != -1:
                 nn.init.zeros_(param)
         
-        # if self.MODEL_WEIGHTS != None:
-        #     state = torch.load(self.MODEL_WEIGHTS)
-        #     self.load_state_dict(state, strict=False)
+        if self.MODEL_WEIGHTS != None:
+            state = torch.load(self.MODEL_WEIGHTS)
+            self.load_state_dict(state, strict=False)
 
     def _make_head(self, pre_stage_channels, bn_type, bn_momentum):
         head_block = Bottleneck

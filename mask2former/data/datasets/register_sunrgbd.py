@@ -46,7 +46,7 @@ labels_info = [
 {"name": "bag", "id": 37, "trainId": 0},
 ]
 
-dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr/'
 annpath = f'mask2former/datasets/sunrgbd/test.txt'
 def sunrgbd():
     # assert mode in ('train', 'eval', 'test')

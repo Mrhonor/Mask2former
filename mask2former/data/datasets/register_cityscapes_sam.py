@@ -5,7 +5,7 @@ from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_sem_seg
 import os.path as osp
 
-dataroot = '/home1/marong/datasets'
+dataroot = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/public/mr'
 annpath = f'mask2former/datasets/Cityscapes/train_gt.txt'
 def cityscapes():
     # assert mode in ('train', 'eval', 'test')
