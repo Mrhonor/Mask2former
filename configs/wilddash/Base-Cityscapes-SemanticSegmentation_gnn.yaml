@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/hrnet_model_0084999.pth"
+  WEIGHTS: "output/hrnet_model_final.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -14,11 +14,11 @@ MODEL:
   AUX_MODE: "train"
   PRETRAINING: False
 DATASETS:
-  TRAIN: ("wilddash2_sem_seg_val", )
-  TEST: ("wilddash2_sem_seg_val", )
-  DATASETS_CATS: [25]
+  TRAIN: ("wilddash2_new_sem_seg_val", )
+  TEST: ("wilddash2_new_sem_seg_test", )
+  DATASETS_CATS: [26]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 268
+  NUM_UNIFY_CLASS: 231
   CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'
 LOSS:
   OHEM_THRESH: 0.7 

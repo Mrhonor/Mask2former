@@ -71,6 +71,7 @@ def register_bdd():
         stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
         thing_dataset_id_to_contiguous_id=lb_map,
         evaluator_type="sem_seg",
+        stuff_colors=[[ 97, 187, 159],[236,   2, 131],     [154, 172, 132],     [174, 203, 111],     [145, 208,  42],     [ 70,  94, 120],     [153,  29, 134],     [218, 118, 115],     [128, 109,  69],     [155, 117, 111],     [225, 115,  77],     [198, 221, 182],     [ 24, 192, 253],     [ 14, 159,  57],     [ 81, 255, 160],     [ 79, 127, 244],     [252,   9, 152],     [ 12,  50, 106],     [103,  81, 234]],
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
 
@@ -123,6 +124,7 @@ def register_bdd_train():
             stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
             stuff_dataset_id_to_contiguous_id=lb_map,
             thing_dataset_id_to_contiguous_id=lb_map,
+            stuff_colors=[[ 97, 187, 159],[236,   2, 131],     [154, 172, 132],     [174, 203, 111],     [145, 208,  42],     [ 70,  94, 120],     [153,  29, 134],     [218, 118, 115],     [128, 109,  69],     [155, 117, 111],     [225, 115,  77],     [198, 221, 182],     [ 24, 192, 253],     [ 14, 159,  57],     [ 81, 255, 160],     [ 79, 127, 244],     [252,   9, 152],     [ 12,  50, 106],     [103,  81, 234]],
             evaluator_type="sem_seg",
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )

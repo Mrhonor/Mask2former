@@ -95,7 +95,7 @@ dataroot = '/home1/marong/datasets/kitti'
 # register_cs()
 
 train_annpath = f'mask2former/datasets/kitti/training.txt'
-def cs_train(anp):
+def kitti_train(anp):
 
     with open(anp, 'r') as fr:
         pairs = fr.read().splitlines()
@@ -116,7 +116,7 @@ def cs_train(anp):
     return dataset_dicts
 
 
-def register_cs_train():
+def register_kitti_train():
     
     
     # meta = _get_cs20k_full_meta()
@@ -129,7 +129,7 @@ def register_cs_train():
         name = f"kitti_sem_seg_{n}"
         annpath = f'mask2former/datasets/kitti/{anp}.txt'
         DatasetCatalog.register(
-            name, lambda x=annpath : cs_train(x)
+            name, lambda x=annpath : kitti_train(x)
         )
         
         MetadataCatalog.get(name).set(
@@ -140,5 +140,5 @@ def register_cs_train():
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )
 
-register_cs_train()
+register_kitti_train()
 

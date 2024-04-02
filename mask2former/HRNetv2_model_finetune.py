@@ -62,8 +62,8 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
         
-        self.register_buffer("finetune_stage", torch.zeros(1), False)
-        self.register_buffer("proto_init", torch.ones(1), False)
+        self.register_buffer("finetune_stage", torch.ones(1), True)
+        self.register_buffer("proto_init", torch.zeros(1), True)
 
         # self.register_buffer("target_bipart", torch.ParameterList([]), False)
 
@@ -84,11 +84,14 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         self.iters = 0
         self.total_cats = 0
         # self.datasets_cats = []
+        self.dataset_adapter = []
         for i in range(0, self.n_datasets):
             # self.datasets_cats.append(self.configer.get('dataset'+str(i+1), 'n_cats'))
             self.total_cats += self.datasets_cats[i]
+            self.dataset_adapter.append(None)
  
         self.criterion = OhemCELoss(ohem_thresh, ignore_lb)
+        
         
         # 初始化 grad
         self.initial = False
@@ -169,67 +172,96 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             images = ImageList.from_tensors(images, self.size_divisibility)
         else:
             images = ImageList.from_tensors(images, -1)
-        targets = [x["sem_seg"].cuda() for x in batched_inputs]
-        targets = self.prepare_targets(targets, images)
-        targets = torch.cat(targets, dim=0)
+
         if self.training:
+            targets = [x["sem_seg"].cuda() for x in batched_inputs]
+            targets = self.prepare_targets(targets, images)
+            targets = torch.cat(targets, dim=0)
             dataset_lbs = [x["dataset_id"] for x in batched_inputs]
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
         else:
-            dataset_lbs = int(batched_inputs[0]["dataset_id"])
-        
-
-            features = self.backbone(images.tensor)
-            outputs = self.proj_head(features, dataset_lbs)
-
-            if self.training:
-                            # bipartite matching-based loss
-                remap_logits = outputs['logits']
-                if self.with_datasets_aux:
-                    aux_logits_out = outputs['aux_logits']
-                losses = {}
-                self.alter_iters += 1
-                for id, logit in enumerate(remap_logits):
-                    logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    loss = self.criterion(logits, targets[dataset_lbs==id])
-                    losses[f'loss_ce{id}'] = loss
-                
-                if self.with_datasets_aux:
-                    for idx, aux_logits in enumerate(aux_logits_out):
-                    
-                        aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                        aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
-                        losses[f'loss_aux{idx}'] = aux_loss
-                for k in list(losses.keys()):
-                    if k in self.criterion.weight_dict:
-                        losses[k] *= self.criterion.weight_dict[k]
-                #     else:
-                #         # remove this loss if not specified in `weight_dict`
-                #         losses.pop(k)
-                return losses
+            # dataset_lbs = 4
+            if "dataset_id" in batched_inputs[0]:
+                dataset_lbs = int(batched_inputs[0]["dataset_id"])
             else:
-                processed_results = []
-                for logit, input_per_image, image_size, uni_logits in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
-                    height = input_per_image.get("height", image_size[0])
-                    width = input_per_image.get("width", image_size[1])
-                    logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                    uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
-                    # logger.info(f"logit shape:{logit.shape}")
-                    processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
-                return processed_results             
+                dataset_lbs = dataset
+            
+        
+        # temp = images.tensor
+        # temp = F.interpolate(temp, size=(1024, 2048), mode="bilinear", align_corners=True)
+
+        # features = self.backbone(temp)
+        features = self.backbone(images.tensor)
+        outputs = self.proj_head(features, dataset_lbs)
+
+        if self.training:
+                        # bipartite matching-based loss
+            remap_logits = outputs['logits']
+            if self.with_datasets_aux:
+                aux_logits_out = outputs['aux_logits']
+            losses = {}
+            for id, logit in enumerate(remap_logits):
+                logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                loss = self.criterion(logits, targets[dataset_lbs==id])
+                # logger.info(f"loss:{loss}")
+                if torch.isnan(loss):
+                    continue
+                losses[f'loss_ce{id}'] = loss
+            
+            if self.with_datasets_aux:
+                for idx, aux_logits in enumerate(aux_logits_out):
+                
+                    aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
+                    if torch.isnan(aux_loss):
+                        continue
+                    losses[f'loss_aux{idx}'] = aux_loss
+            for k in list(losses.keys()):
+                if k in self.loss_weight_dict:
+                    losses[k] *= self.loss_weight_dict[k]
+            #     else:
+            #         # remove this loss if not specified in `weight_dict`
+            #         losses.pop(k)
+            return losses
+        else:
+            processed_results = []
+            for logit, input_per_image, image_size, uni_logits in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
+                height = input_per_image.get("height", image_size[0])
+                width = input_per_image.get("width", image_size[1])
+                logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                # uni_logits = logit
+                uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
+                # dataset_lbs = 0
+                if self.dataset_adapter[dataset_lbs] is not None:
+                    # logger.info(uni_logits.shape)
+                    preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                    this_mseg_map = self.dataset_adapter[dataset_lbs]
+                    # logger.info(this_mseg_map)      
+
+                    preds = this_mseg_map[preds].long()
+                        # 创建一个与原张量相同大小的全零张量
+                    output = torch.zeros(int(torch.max(this_mseg_map)+1), preds.shape[1], preds.shape[2]).cuda()
+                    
+                    # 将最大值所在位置置为 1
+                    output.scatter_(0, preds, 1)
+                    logit = output
+
+                # logger.info(f"logit shape:{logit.shape}")
+                processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
+            return processed_results             
 
     def env_init(self):
         if int(self.proto_init) == 0:
             self.gnn_model.set_init_stage(False)
             unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
             self.proj_head.set_bipartite_graphs(bi_graphs)
-            self.proj_head.set_unify_prototype(unify_prototype, grad=False)
+            self.proj_head.set_unify_prototype(unify_prototype.detach().float(), grad=False)
             self.proto_init = torch.ones(1)
             
         if self.initial == False:
-            logger.info(f"initial: finetune_stage: {self.finetune_stage}, alter_iter:{self.alter_iters}")
+            logger.info(f"initial: finetune_stage: {self.finetune_stage}")
             self.backbone.req_grad(True)
             self.proj_head.req_grad(True)
             self.gnn_model.req_grad(False)
@@ -332,20 +364,10 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
     
     def set_bipartite_graphs(self, bi_graphs):
-        
-        if len(bi_graphs) == 2 * self.n_datasets:
-            for i in range(0, self.n_datasets):
-                self.bipartite_graphs[i] = nn.Parameter(
-                    bi_graphs[2*i], requires_grad=False
-                    )
-        else:
-            # print("bi_graphs len:", len(bi_graphs))
-            for i in range(0, self.n_datasets):
-                # print("i: ", i)
-                self.bipartite_graphs[i] = nn.Parameter(
-                    bi_graphs[i], requires_grad=False
-                    )
-            
+        self.proh_head.set_bipartite_graphs(bi_graphs)
+
+    def set_dataset_adapter(self, dataset_adapter):
+        self.dataset_adapter = dataset_adapter
         
     def set_unify_prototype(self, unify_prototype, grad=False):
         if self.with_datasets_aux and unify_prototype.shape[0] != self.unify_prototype.shape[0]:

@@ -84,8 +84,8 @@ class HRNet_W48_ARCH(nn.Module):
         self.size_divisibility = size_divisibility
         self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
-        self.register_buffer("alter_iters", torch.zeros(1), False)
-        self.register_buffer("train_seg_or_gnn", torch.ones(1), False)
+        self.register_buffer("alter_iters", torch.zeros(1), True)
+        self.register_buffer("train_seg_or_gnn", torch.ones(1), True)
         self.register_buffer("GNN", torch.ones(1), False)
         self.register_buffer("SEG", torch.zeros(1), False)
         # self.register_buffer("target_bipart", torch.ParameterList([]), False)
@@ -107,9 +107,12 @@ class HRNet_W48_ARCH(nn.Module):
         self.iters = 0
         self.total_cats = 0
         # self.datasets_cats = []
+        self.dataset_adapter = []
         for i in range(0, self.n_datasets):
             # self.datasets_cats.append(self.configer.get('dataset'+str(i+1), 'n_cats'))
             self.total_cats += self.datasets_cats[i]
+            self.dataset_adapter.append(None)
+ 
  
         self.criterion = OhemCELoss(ohem_thresh, ignore_lb)
         self.celoss = nn.CrossEntropyLoss(ignore_index=ignore_lb)
@@ -143,7 +146,6 @@ class HRNet_W48_ARCH(nn.Module):
         backbone = build_backbone(cfg)
         # sem_seg_head = build_sem_seg_head(cfg, 720)
         sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
-        gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
         ohem_thresh = cfg.LOSS.OHEM_THRESH
@@ -152,6 +154,11 @@ class HRNet_W48_ARCH(nn.Module):
         graph_node_features = gen_graph_node_feature(cfg)
         init_gnn_iters = cfg.MODEL.GNN.init_stage_iters
         Pretraining = cfg.MODEL.PRETRAINING
+        if Pretraining:
+            gnn_model = None
+        else:
+            gnn_model = build_GNN_module(cfg)
+            
         gnn_iters = cfg.MODEL.GNN.GNN_ITERS
         seg_iters = cfg.MODEL.GNN.SEG_ITERS
         first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
@@ -217,6 +224,7 @@ class HRNet_W48_ARCH(nn.Module):
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
         else:
             dataset_lbs = int(batched_inputs[0]["dataset_id"])
+            # dataset_lbs = 6
         
         if self.Pretraining:
             features = self.backbone(images.tensor)
@@ -254,7 +262,21 @@ class HRNet_W48_ARCH(nn.Module):
                     
                     logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
                     # logger.info(f"logit shape:{logit.shape}")
-                    processed_results.append({"sem_seg": logit})
+                    if self.dataset_adapter[0] is not None:
+                    # logger.info(uni_logits.shape)
+                        preds = torch.argmax(logit, dim=0, keepdim=True).long()
+                        this_mseg_map = self.dataset_adapter[0]
+                        # logger.info(this_mseg_map)      
+
+                        preds = this_mseg_map[preds].long()
+                            # 创建一个与原张量相同大小的全零张量
+                        output = torch.zeros(int(torch.max(this_mseg_map)+1), preds.shape[1], preds.shape[2]).cuda()
+                        
+                        # 将最大值所在位置置为 1
+                        output.scatter_(0, preds, 1)
+                        logit = output
+
+                    processed_results.append({"sem_seg": logit, "uni_logits":logit})
                 return processed_results
         else:
             self.env_init(self.iters)
@@ -289,23 +311,26 @@ class HRNet_W48_ARCH(nn.Module):
                         # logger.info(f"logit shape:{logit.shape}")
                         processed_results.append({"sem_seg": logit})
                 else:
+                    # logger.info(f"{len(bi_graphs)}")
                     if self.with_datasets_aux:
                         ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
                     else:
                         ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype)
                     if len(bi_graphs) == 2*self.n_datasets:
-                        logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[2*dataset_lbs])
+                        logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[2*dataset_lbs+1])
                     else:
                         logits = torch.einsum('bchw, nc -> bnhw', ori_logits, bi_graphs[dataset_lbs])
                     processed_results = []
-                    for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
-                        height = input_per_image.get("height", image_size[0])
-                        width = input_per_image.get("width", image_size[1])
-                        logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                        
-                        logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                        # logger.info(f"logit shape:{logit.shape}")
-                        processed_results.append({"sem_seg": logit, "uni_logits": ori_logits})
+                    input_per_image = batched_inputs[0]
+                    image_size = images.image_sizes[0]
+                    height = input_per_image.get("height", image_size[0])
+                    width = input_per_image.get("width", image_size[1])
+                    # logit = F.interpolate(logits, size=(height, width), mode="bilinear", align_corners=True)
+                    logit = retry_if_cuda_oom(F.interpolate)(logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    
+                    logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                    # logger.info(f"logit shape:{logit.shape}")
+                    processed_results.append({"sem_seg": logit, "uni_logits": ori_logits})
                     
                 return processed_results                
 
@@ -415,6 +440,9 @@ class HRNet_W48_ARCH(nn.Module):
             else:
                 losses['loss_orth'] = self.similarity_dsb(unify_prototype)               
         return losses
+
+    def set_dataset_adapter(self, dataset_adapter):
+        self.dataset_adapter = dataset_adapter
 
     def env_init(self, iters):
         if self.initial == False:
@@ -604,13 +632,16 @@ class HRNet_W48_ARCH(nn.Module):
             self.unify_prototype.requires_grad=grad
 
     def get_bipart_graph(self):
-        _, ori_bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
-        bi_graphs = []
-        if len(ori_bi_graphs) == 2*self.n_datasets:
-            for j in range(0, len(ori_bi_graphs), 2):
-                bi_graphs.append(ori_bi_graphs[j+1].detach())
+        if self.Pretraining:
+            bi_graphs = self.proj_head.bipartite_graphs
         else:
-            bi_graphs = [bigh.detach() for bigh in ori_bi_graphs]
+            _, ori_bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
+            bi_graphs = []
+            if len(ori_bi_graphs) == 2*self.n_datasets:
+                for j in range(0, len(ori_bi_graphs), 2):
+                    bi_graphs.append(ori_bi_graphs[j+1].detach())
+            else:
+                bi_graphs = [bigh.detach() for bigh in ori_bi_graphs]
 
         return bi_graphs
         

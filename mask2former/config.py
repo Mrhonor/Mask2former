@@ -198,6 +198,7 @@ def add_gnn_config(cfg):
     cfg.MODEL.GNN.GNN_ITERS = 20000
     cfg.MODEL.GNN.SEG_ITERS = 20000
     cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS = 15000
+    cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS = 20000
     cfg.MODEL.GNN.INIT_ADJ_PATH = 'output/init_adj_7_datasets.pt'
     cfg.MODEL.GNN.N_POINTS = 12455
     

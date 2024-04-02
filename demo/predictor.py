@@ -23,8 +23,11 @@ class VisualizationDemo(object):
             parallel (bool): whether to run the model in different processes from visualization.
                 Useful since the visualization logic can be slow.
         """
-        self.metadata = MetadataCatalog.get(
-            cfg.DATASETS.TEST[0] if len(cfg.DATASETS.TEST) else "__unused"
+        self.metadata = [MetadataCatalog.get(
+            ds 
+        ) for ds in cfg.DATASETS.TEST]
+        self.metadata_uni = MetadataCatalog.get(
+            "uni"
         )
         self.cpu_device = torch.device("cpu")
         self.instance_mode = instance_mode
@@ -49,7 +52,8 @@ class VisualizationDemo(object):
         predictions = self.predictor(image)
         # Convert image from OpenCV BGR format to Matplotlib RGB format.
         image = image[:, :, ::-1]
-        visualizer = Visualizer(image, self.metadata, instance_mode=self.instance_mode)
+        visualizer = [Visualizer(image, md, instance_mode=self.instance_mode) for md in self.metadata]
+        visualizer_uni = Visualizer(image, self.metadata_uni, instance_mode=self.instance_mode)
         if "panoptic_seg" in predictions:
             panoptic_seg, segments_info = predictions["panoptic_seg"]
             vis_output = visualizer.draw_panoptic_seg_predictions(
@@ -57,14 +61,17 @@ class VisualizationDemo(object):
             )
         else:
             if "sem_seg" in predictions:
-                vis_output = visualizer.draw_sem_seg(
-                    predictions["sem_seg"].argmax(dim=0).to(self.cpu_device)
+                vis_output = [visualizer[i].draw_sem_seg(
+                    predictions["sem_seg"][i].argmax(dim=0).to(self.cpu_device)
+                ) for i in range(len(visualizer))]
+                vis_output_uni = visualizer_uni.draw_sem_seg(
+                    predictions["uni_logits"].argmax(dim=0).to(self.cpu_device)
                 )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)
                 vis_output = visualizer.draw_instance_predictions(predictions=instances)
 
-        return predictions, vis_output
+        return predictions, vis_output, vis_output_uni
 
     def _frame_from_video(self, video):
         while video.isOpened():

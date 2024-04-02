@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/hrnetv2_w48_imagenet_pretrained.pth"
+  WEIGHTS: "output/mapi_model_0199999.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -57,7 +57,7 @@ INPUT:
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:
-  EVAL_PERIOD: 100000
+  EVAL_PERIOD: 400000
   AUG:
     ENABLED: False
     MIN_SIZES: [512, 768, 1024, 1280, 1536, 1792]

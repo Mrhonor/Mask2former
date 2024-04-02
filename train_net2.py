@@ -63,7 +63,9 @@ from mask2former import (
     add_gnn_config,
     DaLiLoaderAdapter,
     LoaderAdapter,
-    build_bipartite_graph_for_unseen
+    build_bipartite_graph_for_unseen,
+    build_bipartite_graph_for_unseen_for_manually,
+    eval_for_mseg_datasets
 )
 
 from PIL import Image
@@ -245,6 +247,12 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
+        print(f"build_test_loader:{dataset_name}")
+                
+        aux_mode = 'test'
+        if '_2' in dataset_name:
+            aux_mode = 'eval'
+            
         if 'cs' in dataset_name:
             dataset_id = 0            
         elif 'mapi' in dataset_name:
@@ -261,11 +269,13 @@ class Trainer(DefaultTrainer):
             dataset_id = 6
         else:
             dataset_id = 0
-        
-        aux_mode = 'test'
-        if '_2' in dataset_name:
-            aux_mode = 'eval'
-            
+            if 'train' in dataset_name:
+                aux_mode = 'unseen'
+
+        dataset_id = 0
+        if 'train' in dataset_name:
+            aux_mode = 'unseen'
+
         return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id)
 
     @classmethod
@@ -400,9 +410,9 @@ def main(args):
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
-        
-        build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
-        
+        # build_bipartite_graph_for_unseen_for_manually(Trainer.build_test_loader, cfg, model)
+        # return
+        # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))

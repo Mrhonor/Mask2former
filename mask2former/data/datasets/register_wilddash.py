@@ -196,9 +196,9 @@ all_lb_infos = [{'name': 'unlabeled', 'id': 0, 'evaluate': False, 'trainId': 255
 {'name': 'bikerack', 'id': 44, 'evaluate': False, 'trainId': 255},
 {'name': 'trafficsignframe', 'id': 45, 'evaluate': True, 'trainId': 25},
 {'name': 'utilitypole', 'id': 46, 'evaluate': True, 'trainId': 26},
-{'name': 'motorcyclist', 'id': 47, 'evaluate': True, 'trainId': 27},
-{'name': 'bicyclist', 'id': 48, 'evaluate': True, 'trainId': 28},
-{'name': 'otherrider', 'id': 49, 'evaluate': True, 'trainId': 29},
+{'name': 'motorcyclist', 'id': 47, 'evaluate': True, 'trainId': 14},
+{'name': 'bicyclist', 'id': 48, 'evaluate': True, 'trainId': 14},
+{'name': 'otherrider', 'id': 49, 'evaluate': True, 'trainId': 14},
 {'name': 'bird', 'id': 50, 'evaluate': True, 'trainId': 30},
 {'name': 'groundanimal', 'id': 51, 'evaluate': True, 'trainId': 31},
 {'name': 'curb', 'id': 52, 'evaluate': True, 'trainId': 32},
@@ -231,43 +231,154 @@ all_lb_infos = [{'name': 'unlabeled', 'id': 0, 'evaluate': False, 'trainId': 255
 {'name': 'servicelane', 'id': 79, 'evaluate': False, 'trainId': 255},
 {'name': 'curbcut', 'id': 80, 'evaluate': False, 'trainId': 255}]
 
-partial_label_name = ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking']
-partial_label_info = [{'name': 'unlabeled', 'id': 0, 'evaluate': False, 'trainId': 255},
-{'name': 'ego vehicle', 'id': 1, 'evaluate': True, 'trainId': 0},
-{'name': 'rectification border', 'id': 2, 'evaluate': False, 'trainId': 255},
-{'name': 'out of roi', 'id': 3, 'evaluate': False, 'trainId': 255},
-{'name': 'static', 'id': 4, 'evaluate': False, 'trainId': 255},
-{'name': 'dynamic', 'id': 5, 'evaluate': False, 'trainId': 255},
-{'name': 'ground', 'id': 6, 'evaluate': False, 'trainId': 255},
-{'name': 'road', 'id': 7, 'evaluate': True, 'trainId': 1},
-{'name': 'sidewalk', 'id': 8, 'evaluate': True, 'trainId': 2},
-{'name': 'parking', 'id': 9, 'evaluate': False, 'trainId': 255},
-{'name': 'rail track', 'id': 10, 'evaluate': False, 'trainId': 255},
-{'name': 'building', 'id': 11, 'evaluate': True, 'trainId': 3},
-{'name': 'wall', 'id': 12, 'evaluate': True, 'trainId': 4},
-{'name': 'fence', 'id': 13, 'evaluate': True, 'trainId': 5},
-{'name': 'guard rail', 'id': 14, 'evaluate': True, 'trainId': 6},
-{'name': 'bridge', 'id': 15, 'evaluate': False, 'trainId': 255},
-{'name': 'tunnel', 'id': 16, 'evaluate': False, 'trainId': 255},
-{'name': 'pole', 'id': 17, 'evaluate': True, 'trainId': 7},
-{'name': 'polegroup', 'id': 18, 'evaluate': False, 'trainId': 255},
-{'name': 'traffic light', 'id': 19, 'evaluate': True, 'trainId': 8},
-{'name': 'traffic sign', 'id': 20, 'evaluate': True, 'trainId': 9},
-{'name': 'vegetation', 'id': 21, 'evaluate': True, 'trainId': 10},
-{'name': 'terrain', 'id': 22, 'evaluate': True, 'trainId': 11},
-{'name': 'sky', 'id': 23, 'evaluate': True, 'trainId': 12},
-{'name': 'person', 'id': 24, 'evaluate': True, 'trainId': 13},
-{'name': 'rider', 'id': 25, 'evaluate': True, 'trainId': 14},
-{'name': 'car', 'id': 26, 'evaluate': True, 'trainId': 15},
-{'name': 'truck', 'id': 27, 'evaluate': True, 'trainId': 16},
-{'name': 'bus', 'id': 28, 'evaluate': True, 'trainId': 17},
-{'name': 'caravan', 'id': 29, 'evaluate': False, 'trainId': 255},
-{'name': 'trailer', 'id': 30, 'evaluate': False, 'trainId': 255},
-{'name': 'train', 'id': 31, 'evaluate': False, 'trainId': 255},
-{'name': 'motorcycle', 'id': 32, 'evaluate': True, 'trainId': 18},
-{'name': 'bicycle', 'id': 33, 'evaluate': True, 'trainId': 19},
-{'name': 'pickup', 'id': 34, 'evaluate': True, 'trainId': 20},
-{'name': 'van', 'id': 35, 'evaluate': True, 'trainId': 21},
-{'name': 'billboard', 'id': 36, 'evaluate': True, 'trainId': 22},
-{'name': 'street-light', 'id': 37, 'evaluate': True, 'trainId': 23},
-{'name': 'road-marking', 'id': 38, 'evaluate': True, 'trainId': 24}]
+dataroot = '/home1/marong/datasets/wd2'
+annpath = f'mask2former/datasets/wilddash2/validation.txt'
+def wilddash2_new():
+    # assert mode in ('train', 'eval', 'test')
+
+    with open(annpath, 'r') as fr:
+        pairs = fr.read().splitlines()
+    img_paths, lb_paths = [], []
+    for pair in pairs:
+        imgpth, lbpth = pair.split(',')
+        img_paths.append(osp.join(dataroot, imgpth))
+        lb_paths.append(osp.join(dataroot, lbpth))
+
+    assert len(img_paths) == len(lb_paths)
+    dataset_dicts = []
+    for (img_path, gt_path) in zip(img_paths, lb_paths):
+        record = {}
+        record["file_name"] = img_path
+        record["sem_seg_file_name"] = gt_path
+        dataset_dicts.append(record)
+
+    return dataset_dicts
+
+
+def register_wilddash2_new():
+    
+    
+    # meta = _get_ade20k_full_meta()
+    # for name, dirname in [("train", "train"), ("val", "val")]:
+    # dirname = 'train'
+    lb_map = {}
+    for el in all_lb_infos:
+        if el['trainId'] > 24:
+            lb_map[el['id']] = 25 #el['trainId']
+        else:
+            lb_map[el['id']] = el['trainId']
+            
+
+    name = f"wilddash2_new_sem_seg_val"
+    DatasetCatalog.register(
+        name, wilddash2_new
+    )
+    
+    MetadataCatalog.get(name).set(
+        stuff_classes= ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void'],
+        stuff_dataset_id_to_contiguous_id=lb_map,
+        thing_dataset_id_to_contiguous_id=lb_map,
+        evaluator_type="sem_seg",
+        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+    )
+
+
+# _root = os.getenv("DETECTRON2_DATASETS", "datasets")
+register_wilddash2_new()
+
+test_dataroot = '/home1/marong/datasets/wilddash2'
+
+test_annpath = f'mask2former/datasets/wilddash2/test.txt'
+def wilddash2_new_test():
+    # assert mode in ('train', 'eval', 'test')
+
+    with open(test_annpath, 'r') as fr:
+        pairs = fr.read().splitlines()
+    img_paths, lb_paths = [], []
+    for pair in pairs:
+        imgpth = pair
+        img_paths.append(osp.join(test_dataroot, imgpth))
+        # lb_paths.append(osp.join(dataroot, lbpth))
+
+    # assert len(img_paths) == len(lb_paths)
+    dataset_dicts = []
+    for img_path in img_paths:
+        record = {}
+        record["file_name"] = img_path
+        # record["sem_seg_file_name"] = gt_path
+        dataset_dicts.append(record)
+
+    return dataset_dicts
+
+
+def register_wilddash2_new_test():
+    
+    
+    # meta = _get_ade20k_full_meta()
+    # for name, dirname in [("train", "train"), ("val", "val")]:
+    # dirname = 'train'
+    lb_map = {}
+    for el in all_lb_infos:
+        if el['trainId'] > 24:
+            lb_map[el['id']] = 25 #el['trainId']
+        else:
+            lb_map[el['id']] = el['trainId']
+            
+
+    name = f"wilddash2_new_sem_seg_test"
+    DatasetCatalog.register(
+        name, wilddash2_new_test
+    )
+    
+    MetadataCatalog.get(name).set(
+        stuff_classes= ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void'],
+        stuff_dataset_id_to_contiguous_id=lb_map,
+        thing_dataset_id_to_contiguous_id=lb_map,
+        evaluator_type="sem_seg",
+        ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
+    )
+
+
+# _root = os.getenv("DETECTRON2_DATASETS", "datasets")
+register_wilddash2_new_test()
+
+# partial_label_name = ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking']
+# partial_label_info = [{'name': 'unlabeled', 'id': 0, 'evaluate': False, 'trainId': 255},
+# {'name': 'ego vehicle', 'id': 1, 'evaluate': True, 'trainId': 0},
+# {'name': 'rectification border', 'id': 2, 'evaluate': False, 'trainId': 255},
+# {'name': 'out of roi', 'id': 3, 'evaluate': False, 'trainId': 255},
+# {'name': 'static', 'id': 4, 'evaluate': False, 'trainId': 255},
+# {'name': 'dynamic', 'id': 5, 'evaluate': False, 'trainId': 255},
+# {'name': 'ground', 'id': 6, 'evaluate': False, 'trainId': 255},
+# {'name': 'road', 'id': 7, 'evaluate': True, 'trainId': 1},
+# {'name': 'sidewalk', 'id': 8, 'evaluate': True, 'trainId': 2},
+# {'name': 'parking', 'id': 9, 'evaluate': False, 'trainId': 255},
+# {'name': 'rail track', 'id': 10, 'evaluate': False, 'trainId': 255},
+# {'name': 'building', 'id': 11, 'evaluate': True, 'trainId': 3},
+# {'name': 'wall', 'id': 12, 'evaluate': True, 'trainId': 4},
+# {'name': 'fence', 'id': 13, 'evaluate': True, 'trainId': 5},
+# {'name': 'guard rail', 'id': 14, 'evaluate': True, 'trainId': 6},
+# {'name': 'bridge', 'id': 15, 'evaluate': False, 'trainId': 255},
+# {'name': 'tunnel', 'id': 16, 'evaluate': False, 'trainId': 255},
+# {'name': 'pole', 'id': 17, 'evaluate': True, 'trainId': 7},
+# {'name': 'polegroup', 'id': 18, 'evaluate': False, 'trainId': 255},
+# {'name': 'traffic light', 'id': 19, 'evaluate': True, 'trainId': 8},
+# {'name': 'traffic sign', 'id': 20, 'evaluate': True, 'trainId': 9},
+# {'name': 'vegetation', 'id': 21, 'evaluate': True, 'trainId': 10},
+# {'name': 'terrain', 'id': 22, 'evaluate': True, 'trainId': 11},
+# {'name': 'sky', 'id': 23, 'evaluate': True, 'trainId': 12},
+# {'name': 'person', 'id': 24, 'evaluate': True, 'trainId': 13},
+# {'name': 'rider', 'id': 25, 'evaluate': True, 'trainId': 14},
+# {'name': 'car', 'id': 26, 'evaluate': True, 'trainId': 15},
+# {'name': 'truck', 'id': 27, 'evaluate': True, 'trainId': 16},
+# {'name': 'bus', 'id': 28, 'evaluate': True, 'trainId': 17},
+# {'name': 'caravan', 'id': 29, 'evaluate': False, 'trainId': 255},
+# {'name': 'trailer', 'id': 30, 'evaluate': False, 'trainId': 255},
+# {'name': 'train', 'id': 31, 'evaluate': False, 'trainId': 255},
+# {'name': 'motorcycle', 'id': 32, 'evaluate': True, 'trainId': 18},
+# {'name': 'bicycle', 'id': 33, 'evaluate': True, 'trainId': 19},
+# {'name': 'pickup', 'id': 34, 'evaluate': True, 'trainId': 20},
+# {'name': 'van', 'id': 35, 'evaluate': True, 'trainId': 21},
+# {'name': 'billboard', 'id': 36, 'evaluate': True, 'trainId': 22},
+# {'name': 'street-light', 'id': 37, 'evaluate': True, 'trainId': 23},
+# {'name': 'road-marking', 'id': 38, 'evaluate': True, 'trainId': 24}]
