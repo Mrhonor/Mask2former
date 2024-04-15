@@ -41,6 +41,7 @@ from detectron2.evaluation import (
     LVISEvaluator,
     SemSegEvaluator,
     verify_results,
+    
 )
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
@@ -61,9 +62,10 @@ from mask2former import (
     add_maskformer2_config,
     add_hrnet_config,
     add_gnn_config,
-    DaLiLoaderAdapter,
     LoaderAdapter,
-    build_bipartite_graph_for_unseen
+    build_bipartite_graph_for_unseen,
+    eval_for_mseg_datasets,
+    UniDetLearnUnifyLabelSpace
 )
 
 from PIL import Image
@@ -74,7 +76,7 @@ from detectron2.structures import ImageList
 import torch.nn.functional as F
 import logging
 
-from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook
+from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook, print_unify_label_space
 
 
 logger = logging.getLogger(__name__)
@@ -252,13 +254,15 @@ class Trainer(DefaultTrainer):
         elif 'sunrgbd' in dataset_name:
             dataset_id = 2
         elif 'bdd' in dataset_name:
-            dataset_id = 3
+            dataset_id = 2
         elif 'idd' in dataset_name:
-            dataset_id = 4
+            dataset_id = 3
         elif 'ade' in dataset_name:
             dataset_id = 5
         elif 'coco' in dataset_name:
             dataset_id = 6
+        elif 'wilddash' in dataset_name:
+            dataset_id = 4
         else:
             dataset_id = 0
         
@@ -400,20 +404,23 @@ def main(args):
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
-        
+        # eval_for_mseg_datasets(Trainer.build_test_loader, cfg, model)
         # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
-        
+        # print_unify_label_space(Trainer.build_test_loader, model, cfg)
+        # return
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
         if comm.is_main_process():
             verify_results(cfg, res)
         return res
+        # return
     
     trainer = Trainer(cfg)
     # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
-    # trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
-    trainer.register_hooks([iter_info_hook()])
+    # trainer.register_hooks([iter_info_hook()])
+    trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
+    # trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

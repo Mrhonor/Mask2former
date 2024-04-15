@@ -15,16 +15,7 @@ import types
 from random import shuffle
 from ...utils.configer import Configer
 
-import nvidia.dali.ops as ops
-import nvidia.dali.types as types
-from nvidia.dali.pipeline import Pipeline
-import nvidia.dali.fn as fn
-from nvidia.dali.plugin.pytorch import LastBatchPolicy
-from nvidia.dali.plugin.pytorch import DALIGenericIterator
 import threading
-from nvidia.dali.plugin.pytorch import DALIClassificationIterator as PyTorchIterator
-
-from nvidia.dali.plugin.pytorch import LastBatchPolicy
 from detectron2.structures import BitMasks, Instances
 import logging
 from ..dataset_mappers.semantic_dataset_mapper import SemanticDatasetMapper
@@ -313,598 +304,598 @@ coco_data_labels_info = [
 {"name": "unlabeled", "id":0, "trainId": 255},
 ]
 
-class IMLbReaderThread(threading.Thread):
-    def __init__(self, im_lb_path):
-        super(IMLbReaderThread, self).__init__()
-        self.im_lb_path = im_lb_path
-        self.im_lb = []
-        # self.lb_map=lb_map
-        # self.trans_func = trans_func
+# class IMLbReaderThread(threading.Thread):
+#     def __init__(self, im_lb_path):
+#         super(IMLbReaderThread, self).__init__()
+#         self.im_lb_path = im_lb_path
+#         self.im_lb = []
+#         # self.lb_map=lb_map
+#         # self.trans_func = trans_func
         
 
-    def run(self):
-        # 在这里执行图像读取操作
-        for im_lb_p in self.im_lb_path:
-            imp, lbp = im_lb_p
-            im = np.fromfile(imp, dtype=np.uint8)
-            lb = np.fromfile(lbp, dtype=np.uint8)
+#     def run(self):
+#         # 在这里执行图像读取操作
+#         for im_lb_p in self.im_lb_path:
+#             imp, lbp = im_lb_p
+#             im = np.fromfile(imp, dtype=np.uint8)
+#             lb = np.fromfile(lbp, dtype=np.uint8)
 
-            self.im_lb.append([im, lb])
-
-
-class ExternalInputIterator(object):
-    def __init__(self, batch_size, dataroot, annpath, mode='train'):
-        # 这一块其实与 dateset 都比较像
-        self.batch_size = batch_size
-        # self.num_instances = num_instances
-        self.shuffled = False
-        if mode == 'train':
-            self.shuffled = True
-
-        # self.img_seq_length = num_instances
-
-        self.lb_map = None
-
-        with open(annpath, 'r') as fr:
-            pairs = fr.read().splitlines()
-        self.img_paths, self.lb_paths = [], []
-        for pair in pairs:
-            imgpth, lbpth = pair.split(',')
-            self.img_paths.append(osp.join(dataroot, imgpth))
-            self.lb_paths.append(osp.join(dataroot, lbpth))
-
-        assert len(self.img_paths) == len(self.lb_paths)
-        self.len = len(self.img_paths)
-
-        # self.list_of_pids = list(images_dict.keys())
-        self._num_classes = len(self.img_paths) #len(self.list_of_pids)
-        self.all_indexs = list(range(self._num_classes))
-        self.n = self.__len__()
+#             self.im_lb.append([im, lb])
 
 
-    def __iter__(self):
-        self.i = 0
-        if self.shuffled:
-            shuffle(self.all_indexs)
-        return self
+# class ExternalInputIterator(object):
+#     def __init__(self, batch_size, dataroot, annpath, mode='train'):
+#         # 这一块其实与 dateset 都比较像
+#         self.batch_size = batch_size
+#         # self.num_instances = num_instances
+#         self.shuffled = False
+#         if mode == 'train':
+#             self.shuffled = True
 
-    def __len__(self):
-        return len(self.all_indexs)
+#         # self.img_seq_length = num_instances
 
-    @staticmethod
-    def image_open(path):
-        return np.fromfile(path, dtype=np.uint8)
+#         self.lb_map = None
 
-    def __next__(self):
-        # 如果溢出了，就终止
-        if self.i >= self.n:
-            self.__iter__()
-            raise StopIteration
+#         with open(annpath, 'r') as fr:
+#             pairs = fr.read().splitlines()
+#         self.img_paths, self.lb_paths = [], []
+#         for pair in pairs:
+#             imgpth, lbpth = pair.split(',')
+#             self.img_paths.append(osp.join(dataroot, imgpth))
+#             self.lb_paths.append(osp.join(dataroot, lbpth))
 
-        # batch_images = []
-        # batch_labels = []
+#         assert len(self.img_paths) == len(self.lb_paths)
+#         self.len = len(self.img_paths)
 
-        leave_num = self.n - self.i
-        current_batch_size = min(self.batch_size, leave_num) # 保证最后一个 batch 不溢出
-        imp, lbp = [], []
-        for _ in range(current_batch_size):
-            tmp_index = self.all_indexs[self.i]
-            # p_id = self.list_of_pids[tmp_index]
-            imp.append(self.img_paths[tmp_index])
-            lbp.append(self.lb_paths[tmp_index])
+#         # self.list_of_pids = list(images_dict.keys())
+#         self._num_classes = len(self.img_paths) #len(self.list_of_pids)
+#         self.all_indexs = list(range(self._num_classes))
+#         self.n = self.__len__()
 
-            self.i += 1
 
-        batch_images, batch_labels = self.get_image_label(imp, lbp)
-        # batch_labels.append(np.fromfile(lbp, dtype=np.uint8))
+#     def __iter__(self):
+#         self.i = 0
+#         if self.shuffled:
+#             shuffle(self.all_indexs)
+#         return self
 
-        # batch_data = []
-        # for ins_i in range(self.num_instances):
-        #     elem = []
-        #     for batch_idx in range(current_batch_size):
-        #         elem.append(batch_images[batch_idx][ins_i])
-        #     batch_data.append(elem)
-        # 其实这块也可以通过 tensor 的 permute 实现？我之前没有注意，大家有兴趣可以试试
+#     def __len__(self):
+#         return len(self.all_indexs)
 
-        return batch_images, batch_labels
+#     @staticmethod
+#     def image_open(path):
+#         return np.fromfile(path, dtype=np.uint8)
+
+#     def __next__(self):
+#         # 如果溢出了，就终止
+#         if self.i >= self.n:
+#             self.__iter__()
+#             raise StopIteration
+
+#         # batch_images = []
+#         # batch_labels = []
+
+#         leave_num = self.n - self.i
+#         current_batch_size = min(self.batch_size, leave_num) # 保证最后一个 batch 不溢出
+#         imp, lbp = [], []
+#         for _ in range(current_batch_size):
+#             tmp_index = self.all_indexs[self.i]
+#             # p_id = self.list_of_pids[tmp_index]
+#             imp.append(self.img_paths[tmp_index])
+#             lbp.append(self.lb_paths[tmp_index])
+
+#             self.i += 1
+
+#         batch_images, batch_labels = self.get_image_label(imp, lbp)
+#         # batch_labels.append(np.fromfile(lbp, dtype=np.uint8))
+
+#         # batch_data = []
+#         # for ins_i in range(self.num_instances):
+#         #     elem = []
+#         #     for batch_idx in range(current_batch_size):
+#         #         elem.append(batch_images[batch_idx][ins_i])
+#         #     batch_data.append(elem)
+#         # 其实这块也可以通过 tensor 的 permute 实现？我之前没有注意，大家有兴趣可以试试
+
+#         return batch_images, batch_labels
     
-    def get_image_label(self, impth, lbpth):
-        threads = []
-        for i in range(0, len(impth), 2):
-            if i+1 < len(impth):
-                im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
-            else:
-                im_lb_path = [[impth[i], lbpth[i]]]
-            threads.append(IMLbReaderThread(im_lb_path))
+#     def get_image_label(self, impth, lbpth):
+#         threads = []
+#         for i in range(0, len(impth), 2):
+#             if i+1 < len(impth):
+#                 im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
+#             else:
+#                 im_lb_path = [[impth[i], lbpth[i]]]
+#             threads.append(IMLbReaderThread(im_lb_path))
 
-        # 启动线程
-        for thread in threads:
-            thread.start()
+#         # 启动线程
+#         for thread in threads:
+#             thread.start()
 
-        # 等待所有线程完成
-        for thread in threads:
-            thread.join()
+#         # 等待所有线程完成
+#         for thread in threads:
+#             thread.join()
         
-        ims = []
-        lbs = []
-        for thread in threads:
-            im_lbs = thread.im_lb
-            for im_lb in im_lbs:
-                im, lb = im_lb
-                ims.append(im)
-                lbs.append(lb)
+#         ims = []
+#         lbs = []
+#         for thread in threads:
+#             im_lbs = thread.im_lb
+#             for im_lb in im_lbs:
+#                 im, lb = im_lb
+#                 ims.append(im)
+#                 lbs.append(lb)
 
-        return ims, lbs
+#         return ims, lbs
 
-    # next = __next__
-    # len = __len__
-class ExternalInputIteratorMul(object):
-    def __init__(self, batch_size, dataroot, annpath, mode='train'):
-        # 这一块其实与 dateset 都比较像
-        self.n_datasets = len(batch_size)
-        self.batch_size = batch_size
-        # self.num_instances = num_instances
-        self.shuffled = False
-        if mode == 'train':
-            self.shuffled = True
+#     # next = __next__
+#     # len = __len__
+# class ExternalInputIteratorMul(object):
+#     def __init__(self, batch_size, dataroot, annpath, mode='train'):
+#         # 这一块其实与 dateset 都比较像
+#         self.n_datasets = len(batch_size)
+#         self.batch_size = batch_size
+#         # self.num_instances = num_instances
+#         self.shuffled = False
+#         if mode == 'train':
+#             self.shuffled = True
 
-        # self.img_seq_length = num_instances
+#         # self.img_seq_length = num_instances
 
-        self.lb_map = None
-        self.img_paths, self.lb_paths = [], []
-        self.len = 0
-        self.n = []
-        for root, anp in zip(dataroot, annpath):
-            with open(anp, 'r') as fr:
-                pairs = fr.read().splitlines()
-            self.img_path, self.lb_path = [], []
-            for pair in pairs:
-                imgpth, lbpth = pair.split(',')
-                self.img_path.append(osp.join(root, imgpth))
-                self.lb_path.append(osp.join(root, lbpth))
+#         self.lb_map = None
+#         self.img_paths, self.lb_paths = [], []
+#         self.len = 0
+#         self.n = []
+#         for root, anp in zip(dataroot, annpath):
+#             with open(anp, 'r') as fr:
+#                 pairs = fr.read().splitlines()
+#             self.img_path, self.lb_path = [], []
+#             for pair in pairs:
+#                 imgpth, lbpth = pair.split(',')
+#                 self.img_path.append(osp.join(root, imgpth))
+#                 self.lb_path.append(osp.join(root, lbpth))
 
-            assert len(self.img_path) == len(self.lb_path)
-            self.img_paths.append(self.img_path)
-            self.lb_paths.append(self.lb_path)
-            self.len += len(self.img_path)
-            self.n.append(len(self.img_path))
+#             assert len(self.img_path) == len(self.lb_path)
+#             self.img_paths.append(self.img_path)
+#             self.lb_paths.append(self.lb_path)
+#             self.len += len(self.img_path)
+#             self.n.append(len(self.img_path))
     
-        # self.len = len(self.img_paths)
+#         # self.len = len(self.img_paths)
 
-        # self.list_of_pids = list(images_dict.keys())
-        # self._num_classes = len(self.img_paths) #len(self.list_of_pids)
-        self.all_indexs = [list(range(len(imp))) for imp in self.img_paths]
+#         # self.list_of_pids = list(images_dict.keys())
+#         # self._num_classes = len(self.img_paths) #len(self.list_of_pids)
+#         self.all_indexs = [list(range(len(imp))) for imp in self.img_paths]
         
-        self.i = [0 for _ in self.img_paths]
+#         self.i = [0 for _ in self.img_paths]
 
 
-    def __iter__(self):
-        self.i = [0 for _ in self.img_paths]
-        if self.shuffled:
-            for i in range(len(self.all_indexs)):
-                shuffle(self.all_indexs[i]) 
-        return self
+#     def __iter__(self):
+#         self.i = [0 for _ in self.img_paths]
+#         if self.shuffled:
+#             for i in range(len(self.all_indexs)):
+#                 shuffle(self.all_indexs[i]) 
+#         return self
 
-    def __len__(self):
-        return self.len #len(self.all_indexs)
+#     def __len__(self):
+#         return self.len #len(self.all_indexs)
 
-    @staticmethod
-    def image_open(path):
-        return np.fromfile(path, dtype=np.uint8)
+#     @staticmethod
+#     def image_open(path):
+#         return np.fromfile(path, dtype=np.uint8)
 
-    def __next__(self):
-        # 如果溢出了，就终止
-        batch_images = []
-        batch_labels = []
-        for idx in range(self.n_datasets):
+#     def __next__(self):
+#         # 如果溢出了，就终止
+#         batch_images = []
+#         batch_labels = []
+#         for idx in range(self.n_datasets):
             
-                # raise StopIteration
-            # leave_num = self.n[idx] - self.i[idx]
-            # current_batch_size = min(self.batch_size, leave_num) # 保证最后一个 batch 不溢出
-            for _ in range(self.batch_size[idx]):
-                if self.i[idx] >= self.n[idx]:
-                    # self.__iter__()
-                    self.i[idx] = 0
-                    if self.shuffled:
-                        shuffle(self.all_indexs[idx])
-                tmp_index = self.all_indexs[idx][self.i[idx]]
-                # p_id = self.list_of_pids[tmp_index]
-                imp = self.img_paths[idx][tmp_index]
-                lbp = self.lb_paths[idx][tmp_index]
-                batch_images.append(imp)
-                batch_labels.append(lbp)
+#                 # raise StopIteration
+#             # leave_num = self.n[idx] - self.i[idx]
+#             # current_batch_size = min(self.batch_size, leave_num) # 保证最后一个 batch 不溢出
+#             for _ in range(self.batch_size[idx]):
+#                 if self.i[idx] >= self.n[idx]:
+#                     # self.__iter__()
+#                     self.i[idx] = 0
+#                     if self.shuffled:
+#                         shuffle(self.all_indexs[idx])
+#                 tmp_index = self.all_indexs[idx][self.i[idx]]
+#                 # p_id = self.list_of_pids[tmp_index]
+#                 imp = self.img_paths[idx][tmp_index]
+#                 lbp = self.lb_paths[idx][tmp_index]
+#                 batch_images.append(imp)
+#                 batch_labels.append(lbp)
 
-                self.i[idx] += 1
+#                 self.i[idx] += 1
 
-            # batch_data = []
-            # for ins_i in range(self.num_instances):
-            #     elem = []
-            #     for batch_idx in range(current_batch_size):
-            #         elem.append(batch_images[batch_idx][ins_i])
-            #     batch_data.append(elem)
-            # 其实这块也可以通过 tensor 的 permute 
-        batch_images, batch_labels = self.get_image_label(batch_images, batch_labels)
-        return batch_images, batch_labels
+#             # batch_data = []
+#             # for ins_i in range(self.num_instances):
+#             #     elem = []
+#             #     for batch_idx in range(current_batch_size):
+#             #         elem.append(batch_images[batch_idx][ins_i])
+#             #     batch_data.append(elem)
+#             # 其实这块也可以通过 tensor 的 permute 
+#         batch_images, batch_labels = self.get_image_label(batch_images, batch_labels)
+#         return batch_images, batch_labels
 
-    def get_image_label(self, impth, lbpth):
-        threads = []
-        # for i in range(0, len(impth), 2):
-        #     if i+1 < len(impth):
-        #         im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
-        #     else:
-        #         im_lb_path = [[impth[i], lbpth[i]]]
-        #     threads.append(IMLbReaderThread(im_lb_path))
-        for i in range(0, len(impth)):
-            # if i+1 < len(impth):
-            #     im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
-            # else:
-            im_lb_path = [[impth[i], lbpth[i]]]
-            threads.append(IMLbReaderThread(im_lb_path))
-        # 启动线程
-        for thread in threads:
-            thread.start()
+#     def get_image_label(self, impth, lbpth):
+#         threads = []
+#         # for i in range(0, len(impth), 2):
+#         #     if i+1 < len(impth):
+#         #         im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
+#         #     else:
+#         #         im_lb_path = [[impth[i], lbpth[i]]]
+#         #     threads.append(IMLbReaderThread(im_lb_path))
+#         for i in range(0, len(impth)):
+#             # if i+1 < len(impth):
+#             #     im_lb_path = [[impth[i], lbpth[i]], [impth[i+1], lbpth[i+1]]]
+#             # else:
+#             im_lb_path = [[impth[i], lbpth[i]]]
+#             threads.append(IMLbReaderThread(im_lb_path))
+#         # 启动线程
+#         for thread in threads:
+#             thread.start()
 
-        # 等待所有线程完成
-        for thread in threads:
-            thread.join()
+#         # 等待所有线程完成
+#         for thread in threads:
+#             thread.join()
         
-        ims = []
-        lbs = []
-        for thread in threads:
-            im_lbs = thread.im_lb
-            for im_lb in im_lbs:
-                im, lb = im_lb
-                ims.append(im)
-                lbs.append(lb)
+#         ims = []
+#         lbs = []
+#         for thread in threads:
+#             im_lbs = thread.im_lb
+#             for im_lb in im_lbs:
+#                 im, lb = im_lb
+#                 ims.append(im)
+#                 lbs.append(lb)
 
-        return ims, lbs
+#         return ims, lbs
 
-def ExternalSourcePipelineMul(batch_size, num_threads, device_id, external_data, mode='train', scales=(0.5, 1.), size=(768, 768), p=0.5, brightness=0.4, contrast=0.4, saturation=0.4):
+# def ExternalSourcePipelineMul(batch_size, num_threads, device_id, external_data, mode='train', scales=(0.5, 1.), size=(768, 768), p=0.5, brightness=0.4, contrast=0.4, saturation=0.4):
     
-    pipe = Pipeline(batch_size, num_threads, device_id, prefetch_queue_depth=4)
-    crop_h, crop_w = size
-    if not brightness is None and brightness >= 0:
-        brightness = [max(1-brightness, 0), 1+brightness]
-    if not contrast is None and contrast >= 0:
-        contrast = [max(1-contrast, 0), 1+contrast]
-    if not saturation is None and saturation >= 0:
-        saturation = [max(1-saturation, 0), 1+saturation]
+#     pipe = Pipeline(batch_size, num_threads, device_id, prefetch_queue_depth=4)
+#     crop_h, crop_w = size
+#     if not brightness is None and brightness >= 0:
+#         brightness = [max(1-brightness, 0), 1+brightness]
+#     if not contrast is None and contrast >= 0:
+#         contrast = [max(1-contrast, 0), 1+contrast]
+#     if not saturation is None and saturation >= 0:
+#         saturation = [max(1-saturation, 0), 1+saturation]
 
-    # mean=[0.3257, 0.3690, 0.3223] # city, rgb
-    # std=[0.2112, 0.2148, 0.2115]
-    MEAN = np.asarray([0.3257, 0.3690, 0.3223])[None, None, :]
-    STD = np.asarray([0.2112, 0.2148, 0.2115])[None, None, :]
-    SCALE = 1 / 255.
-    with pipe:
-        jpegs, labels = fn.external_source(source=external_data, num_outputs=2, dtype=types.UINT8)
-        images = fn.decoders.image(jpegs, device="mixed")
-        labels = fn.decoders.image(labels, device="mixed", output_type=types.GRAY)
-        # images = fn.random_resized_crop()
-        # for i in range(len(images)):
-        # print(fn.peek_image_shape(labels))
-        # shape = fn.peek_image_shape(labels)
-        # images = images.gpu()
-        # labels = labels.gpu()
-        if mode == 'train':
-            images = fn.random_resized_crop(images, interp_type=types.INTERP_LINEAR, size=size, seed=1234)
-            labels = fn.random_resized_crop(labels, antialias=False, interp_type=types.INTERP_NN, size=size, seed=1234)
+#     # mean=[0.3257, 0.3690, 0.3223] # city, rgb
+#     # std=[0.2112, 0.2148, 0.2115]
+#     MEAN = np.asarray([0.3257, 0.3690, 0.3223])[None, None, :]
+#     STD = np.asarray([0.2112, 0.2148, 0.2115])[None, None, :]
+#     SCALE = 1 / 255.
+#     with pipe:
+#         jpegs, labels = fn.external_source(source=external_data, num_outputs=2, dtype=types.UINT8)
+#         images = fn.decoders.image(jpegs, device="mixed")
+#         labels = fn.decoders.image(labels, device="mixed", output_type=types.GRAY)
+#         # images = fn.random_resized_crop()
+#         # for i in range(len(images)):
+#         # print(fn.peek_image_shape(labels))
+#         # shape = fn.peek_image_shape(labels)
+#         # images = images.gpu()
+#         # labels = labels.gpu()
+#         if mode == 'train':
+#             images = fn.random_resized_crop(images, interp_type=types.INTERP_LINEAR, size=size, seed=1234)
+#             labels = fn.random_resized_crop(labels, antialias=False, interp_type=types.INTERP_NN, size=size, seed=1234)
 
-            brightness_rate = fn.random.uniform(range=(min(brightness), max(brightness)))
-            contrast_rate = fn.random.uniform(range=(min(contrast), max(contrast)))
-            saturation_rate = fn.random.uniform(range=(min(saturation), max(saturation)))
-            images = fn.brightness_contrast(images, brightness=brightness_rate, contrast_center=74, contrast=contrast_rate)
-            images = fn.saturation(images, saturation=saturation_rate)
+#             brightness_rate = fn.random.uniform(range=(min(brightness), max(brightness)))
+#             contrast_rate = fn.random.uniform(range=(min(contrast), max(contrast)))
+#             saturation_rate = fn.random.uniform(range=(min(saturation), max(saturation)))
+#             images = fn.brightness_contrast(images, brightness=brightness_rate, contrast_center=74, contrast=contrast_rate)
+#             images = fn.saturation(images, saturation=saturation_rate)
 
-        # images = fn.cast(images, dtype=types.FLOAT)
-        # images = fn.normalize(images, scale=1/255)
-        # images = fn.normalize(images, axes=[0,1], mean=mean, stddev=std)
-        images = fn.normalize(
-            images,
-            mean=MEAN / SCALE,
-            stddev=STD,
-            scale=SCALE,
-            dtype=types.FLOAT,
-        )
+#         # images = fn.cast(images, dtype=types.FLOAT)
+#         # images = fn.normalize(images, scale=1/255)
+#         # images = fn.normalize(images, axes=[0,1], mean=mean, stddev=std)
+#         images = fn.normalize(
+#             images,
+#             mean=MEAN / SCALE,
+#             stddev=STD,
+#             scale=SCALE,
+#             dtype=types.FLOAT,
+#         )
         
-        # if lb_map is not None: 
-        # print(lb_map)
-        # labels = fn.lookup_table(labels, keys=list(range(len(lb_map))), values=list(lb_map), default_value=255)
-        labels = fn.cast(labels, dtype=types.UINT8)
-        pipe.set_outputs(images, labels)
-    return pipe
+#         # if lb_map is not None: 
+#         # print(lb_map)
+#         # labels = fn.lookup_table(labels, keys=list(range(len(lb_map))), values=list(lb_map), default_value=255)
+#         labels = fn.cast(labels, dtype=types.UINT8)
+#         pipe.set_outputs(images, labels)
+#     return pipe
 
-def get_DALI_data_loaderMul(configer, aux_mode='eval', stage=None):
-    mode = aux_mode
-    n_datasets = configer.get('n_datasets')
-    max_iter = configer.get('lr', 'max_iter')
+# def get_DALI_data_loaderMul(configer, aux_mode='eval', stage=None):
+#     mode = aux_mode
+#     n_datasets = configer.get('n_datasets')
+#     max_iter = configer.get('lr', 'max_iter')
     
-    if mode == 'train':
-        scales = configer.get('train', 'scales')
-        cropsize = configer.get('train', 'cropsize')
+#     if mode == 'train':
+#         scales = configer.get('train', 'scales')
+#         cropsize = configer.get('train', 'cropsize')
         
-        if stage != None:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
-            print(annpath)
-            batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
-        else:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
-            batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         if stage != None:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
+#             print(annpath)
+#             batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
+#         else:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
+#             batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = True
-        drop_last = True
-    elif mode == 'eval':
+#         shuffle = True
+#         drop_last = True
+#     elif mode == 'eval':
         
-        batchsize = [configer.get('dataset'+str(i), 'eval_ims_per_gpu') for i in range(1, n_datasets+1)]
-        annpath = [configer.get('dataset'+str(i), 'val_im_anns') for i in range(1, n_datasets+1)]
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         batchsize = [configer.get('dataset'+str(i), 'eval_ims_per_gpu') for i in range(1, n_datasets+1)]
+#         annpath = [configer.get('dataset'+str(i), 'val_im_anns') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = False
-        drop_last = False
-    elif mode == 'ret_path':
+#         shuffle = False
+#         drop_last = False
+#     elif mode == 'ret_path':
         
-        batchsize = [1 for i in range(1, n_datasets+1)]
-        if stage != None:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
-            print(annpath)
-        else:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
+#         batchsize = [1 for i in range(1, n_datasets+1)]
+#         if stage != None:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
+#             print(annpath)
+#         else:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
             
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = False
-        drop_last = False
+#         shuffle = False
+#         drop_last = False
         
 
-    ds = ExternalInputIteratorMul(batchsize, imroot, annpath, mode=mode)
+#     ds = ExternalInputIteratorMul(batchsize, imroot, annpath, mode=mode)
          
-    total_bs = 0
-    for bs in batchsize:
-        total_bs += bs
-    pipe = ExternalSourcePipelineMul(batch_size=total_bs, num_threads=64, device_id=0, external_data=ds, mode=mode)
-    # lb_maps = []
-    # for i, data_name in enumerate(data_reader):
-    #     label_info = eval(data_name).labels_info
-    #     lb_map = np.arange(256).astype(np.uint8)
+#     total_bs = 0
+#     for bs in batchsize:
+#         total_bs += bs
+#     pipe = ExternalSourcePipelineMul(batch_size=total_bs, num_threads=64, device_id=0, external_data=ds, mode=mode)
+#     # lb_maps = []
+#     # for i, data_name in enumerate(data_reader):
+#     #     label_info = eval(data_name).labels_info
+#     #     lb_map = np.arange(256).astype(np.uint8)
        
-    #     for el in label_info:
-    #         lb_map[el['id']] = el['trainId']
+#     #     for el in label_info:
+#     #         lb_map[el['id']] = el['trainId']
         
-    #     lb_maps.append(lb_map)
+#     #     lb_maps.append(lb_map)
         
         
 
-    if mode == 'train':
-        dl = PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.DROP) 
-    else:
-        dl = PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL)
+#     if mode == 'train':
+#         dl = PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.DROP) 
+#     else:
+#         dl = PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL)
 
-    return dl
+#     return dl
 
 
-def ExternalSourcePipeline(batch_size, num_threads, device_id, external_data, lb_map=None, mode='train', scales=(0.5, 1.), size=(768, 768), p=0.5, brightness=0.4, contrast=0.4, saturation=0.4):
+# def ExternalSourcePipeline(batch_size, num_threads, device_id, external_data, lb_map=None, mode='train', scales=(0.5, 1.), size=(768, 768), p=0.5, brightness=0.4, contrast=0.4, saturation=0.4):
     
-    pipe = Pipeline(batch_size, num_threads, device_id, prefetch_queue_depth=4)
-    crop_h, crop_w = size
-    if not brightness is None and brightness >= 0:
-        brightness = [max(1-brightness, 0), 1+brightness]
-    if not contrast is None and contrast >= 0:
-        contrast = [max(1-contrast, 0), 1+contrast]
-    if not saturation is None and saturation >= 0:
-        saturation = [max(1-saturation, 0), 1+saturation]
+#     pipe = Pipeline(batch_size, num_threads, device_id, prefetch_queue_depth=4)
+#     crop_h, crop_w = size
+#     if not brightness is None and brightness >= 0:
+#         brightness = [max(1-brightness, 0), 1+brightness]
+#     if not contrast is None and contrast >= 0:
+#         contrast = [max(1-contrast, 0), 1+contrast]
+#     if not saturation is None and saturation >= 0:
+#         saturation = [max(1-saturation, 0), 1+saturation]
 
-    # mean=[0.3257, 0.3690, 0.3223] # city, rgb
-    # std=[0.2112, 0.2148, 0.2115]
-    MEAN = np.asarray([0.3257, 0.3690, 0.3223])[None, None, :]
-    STD = np.asarray([0.2112, 0.2148, 0.2115])[None, None, :]
-    SCALE = 1 / 255.
-    with pipe:
-        jpegs, labels = fn.external_source(source=external_data, num_outputs=2, dtype=types.UINT8)
-        images = fn.decoders.image(jpegs, device="mixed")
-        labels = fn.decoders.image(labels, device="cpu", output_type=types.GRAY)
-        # images = fn.random_resized_crop()
-        # for i in range(len(images)):
-        # print(fn.peek_image_shape(labels))
-        shape = fn.shapes(labels)
-        # images = images.gpu()
-        labels = labels.gpu()
-        if mode == 'train':
-            scale = np.random.uniform(min(scales), max(scales))
+#     # mean=[0.3257, 0.3690, 0.3223] # city, rgb
+#     # std=[0.2112, 0.2148, 0.2115]
+#     MEAN = np.asarray([0.3257, 0.3690, 0.3223])[None, None, :]
+#     STD = np.asarray([0.2112, 0.2148, 0.2115])[None, None, :]
+#     SCALE = 1 / 255.
+#     with pipe:
+#         jpegs, labels = fn.external_source(source=external_data, num_outputs=2, dtype=types.UINT8)
+#         images = fn.decoders.image(jpegs, device="mixed")
+#         labels = fn.decoders.image(labels, device="cpu", output_type=types.GRAY)
+#         # images = fn.random_resized_crop()
+#         # for i in range(len(images)):
+#         # print(fn.peek_image_shape(labels))
+#         shape = fn.shapes(labels)
+#         # images = images.gpu()
+#         labels = labels.gpu()
+#         if mode == 'train':
+#             scale = np.random.uniform(min(scales), max(scales))
             
-            images = fn.resize(images, interp_type=types.INTERP_LINEAR, resize_x=shape[1]*scale, resize_y=shape[0]*scale)
-            labels = fn.resize(labels, antialias=False, interp_type=types.INTERP_NN, size=shape[:2]*scale)
+#             images = fn.resize(images, interp_type=types.INTERP_LINEAR, resize_x=shape[1]*scale, resize_y=shape[0]*scale)
+#             labels = fn.resize(labels, antialias=False, interp_type=types.INTERP_NN, size=shape[:2]*scale)
 
-            crop_pos_x = fn.random.uniform(range=(0, 1))
-            crop_pos_y = fn.random.uniform(range=(0, 1))            
+#             crop_pos_x = fn.random.uniform(range=(0, 1))
+#             crop_pos_y = fn.random.uniform(range=(0, 1))            
 
-            images = fn.crop(images, crop=size, crop_pos_x=crop_pos_x, crop_pos_y=crop_pos_y, out_of_bounds_policy='pad')
-            labels = fn.crop(labels, crop=size, crop_pos_x=crop_pos_x, crop_pos_y=crop_pos_y, fill_values=255, out_of_bounds_policy='pad')            
-        # labels = fn.decoders.image(labels, device="mixed", output_type=types.GRAY)
-        # # images = fn.random_resized_crop()
-        # # for i in range(len(images)):
-        # # print(fn.peek_image_shape(labels))
-        # # shape = fn.peek_image_shape(labels)
-        # # images = images.gpu()
-        # # labels = labels.gpu()
-        # if mode == 'train':
-        #     images = fn.random_resized_crop(images, interp_type=types.INTERP_LINEAR, size=size, seed=1234)
-        #     labels = fn.random_resized_crop(labels, antialias=False, interp_type=types.INTERP_NN, size=size, seed=1234)
+#             images = fn.crop(images, crop=size, crop_pos_x=crop_pos_x, crop_pos_y=crop_pos_y, out_of_bounds_policy='pad')
+#             labels = fn.crop(labels, crop=size, crop_pos_x=crop_pos_x, crop_pos_y=crop_pos_y, fill_values=255, out_of_bounds_policy='pad')            
+#         # labels = fn.decoders.image(labels, device="mixed", output_type=types.GRAY)
+#         # # images = fn.random_resized_crop()
+#         # # for i in range(len(images)):
+#         # # print(fn.peek_image_shape(labels))
+#         # # shape = fn.peek_image_shape(labels)
+#         # # images = images.gpu()
+#         # # labels = labels.gpu()
+#         # if mode == 'train':
+#         #     images = fn.random_resized_crop(images, interp_type=types.INTERP_LINEAR, size=size, seed=1234)
+#         #     labels = fn.random_resized_crop(labels, antialias=False, interp_type=types.INTERP_NN, size=size, seed=1234)
 
-            brightness_rate = fn.random.uniform(range=(min(brightness), max(brightness)))
-            contrast_rate = fn.random.uniform(range=(min(contrast), max(contrast)))
-            saturation_rate = fn.random.uniform(range=(min(saturation), max(saturation)))
-            images = fn.brightness_contrast(images, brightness=brightness_rate, contrast_center=74, contrast=contrast_rate)
-            images = fn.saturation(images, saturation=saturation_rate)
+#             brightness_rate = fn.random.uniform(range=(min(brightness), max(brightness)))
+#             contrast_rate = fn.random.uniform(range=(min(contrast), max(contrast)))
+#             saturation_rate = fn.random.uniform(range=(min(saturation), max(saturation)))
+#             images = fn.brightness_contrast(images, brightness=brightness_rate, contrast_center=74, contrast=contrast_rate)
+#             images = fn.saturation(images, saturation=saturation_rate)
 
-        # images = fn.cast(images, dtype=types.FLOAT)
-        # images = fn.normalize(images, scale=1/255)
-        # images = fn.normalize(images, axes=[0,1], mean=mean, stddev=std)
-        images = fn.normalize(
-            images,
-            mean=MEAN / SCALE,
-            stddev=STD,
-            scale=SCALE,
-            dtype=types.FLOAT,
-        )
+#         # images = fn.cast(images, dtype=types.FLOAT)
+#         # images = fn.normalize(images, scale=1/255)
+#         # images = fn.normalize(images, axes=[0,1], mean=mean, stddev=std)
+#         images = fn.normalize(
+#             images,
+#             mean=MEAN / SCALE,
+#             stddev=STD,
+#             scale=SCALE,
+#             dtype=types.FLOAT,
+#         )
         
-        if lb_map is not None: 
-        # print(lb_map)
-            labels = fn.lookup_table(labels, keys=list(range(len(lb_map))), values=list(lb_map), default_value=255)
-        labels = fn.cast(labels, dtype=types.UINT8)
-        pipe.set_outputs(images, labels)
-    return pipe
+#         if lb_map is not None: 
+#         # print(lb_map)
+#             labels = fn.lookup_table(labels, keys=list(range(len(lb_map))), values=list(lb_map), default_value=255)
+#         labels = fn.cast(labels, dtype=types.UINT8)
+#         pipe.set_outputs(images, labels)
+#     return pipe
 
-def get_DALI_data_loader(configer, aux_mode='eval', stage=None):
-    mode = aux_mode
-    n_datasets = configer.get('n_datasets')
-    max_iter = configer.get('lr', 'max_iter')
+# def get_DALI_data_loader(configer, aux_mode='eval', stage=None):
+#     mode = aux_mode
+#     n_datasets = configer.get('n_datasets')
+#     max_iter = configer.get('lr', 'max_iter')
     
-    if mode == 'train':
-        scales = configer.get('train', 'scales')
-        cropsize = configer.get('train', 'cropsize')
+#     if mode == 'train':
+#         scales = configer.get('train', 'scales')
+#         cropsize = configer.get('train', 'cropsize')
         
-        if stage != None:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
-            print(annpath)
-            batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
-        else:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
-            batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         if stage != None:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
+#             print(annpath)
+#             batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
+#         else:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
+#             batchsize = [configer.get('dataset'+str(i), 'ims_per_gpu') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = True
-        drop_last = True
-    elif mode == 'eval':
+#         shuffle = True
+#         drop_last = True
+#     elif mode == 'eval':
         
-        batchsize = [configer.get('dataset'+str(i), 'eval_ims_per_gpu') for i in range(1, n_datasets+1)]
-        annpath = [configer.get('dataset'+str(i), 'val_im_anns') for i in range(1, n_datasets+1)]
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         batchsize = [configer.get('dataset'+str(i), 'eval_ims_per_gpu') for i in range(1, n_datasets+1)]
+#         annpath = [configer.get('dataset'+str(i), 'val_im_anns') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = False
-        drop_last = False
-    elif mode == 'ret_path':
+#         shuffle = False
+#         drop_last = False
+#     elif mode == 'ret_path':
         
-        batchsize = [1 for i in range(1, n_datasets+1)]
-        if stage != None:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
-            print(annpath)
-        else:
-            annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
+#         batchsize = [1 for i in range(1, n_datasets+1)]
+#         if stage != None:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
+#             print(annpath)
+#         else:
+#             annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
             
-        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
-        data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
+#         imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+#         data_reader = [configer.get('dataset'+str(i), 'dataset_name') for i in range(1, n_datasets+1)]
         
-        shuffle = False
-        drop_last = False
+#         shuffle = False
+#         drop_last = False
         
 
-    ds = [ExternalInputIterator(bs, root, path, mode=mode)
-          for bs, root, path in zip(batchsize, imroot, annpath)]
+#     ds = [ExternalInputIterator(bs, root, path, mode=mode)
+#           for bs, root, path in zip(batchsize, imroot, annpath)]
     
-    pipes = []
-    for i, data_name in enumerate(data_reader):
-        label_info = eval(data_name+'_labels_info')
-        lb_map = np.arange(256).astype(np.uint8)
-        # print(lb_map)
-        for el in label_info:
-            lb_map[el['id']] = el['trainId']
-        pipe = ExternalSourcePipeline(batch_size=batchsize[i], num_threads=8, device_id=0, external_data=ds[i], lb_map=lb_map, mode=mode)
-        pipes.append(pipe)
+#     pipes = []
+#     for i, data_name in enumerate(data_reader):
+#         label_info = eval(data_name+'_labels_info')
+#         lb_map = np.arange(256).astype(np.uint8)
+#         # print(lb_map)
+#         for el in label_info:
+#             lb_map[el['id']] = el['trainId']
+#         pipe = ExternalSourcePipeline(batch_size=batchsize[i], num_threads=8, device_id=0, external_data=ds[i], lb_map=lb_map, mode=mode)
+#         pipes.append(pipe)
 
-    if mode == 'train':
-        dl = [PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.DROP) for pipe in pipes]
-    else:
-        dl = [PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL) for pipe in pipes]
+#     if mode == 'train':
+#         dl = [PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.DROP) for pipe in pipes]
+#     else:
+#         dl = [PyTorchIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL) for pipe in pipes]
 
-    return dl
+#     return dl
 
-class DaLiLoaderAdapter:
-    def __init__(self, cfg, aux_mode='train', dataset_id=None) -> None:
-        self.configer = Configer(configs=cfg.DATASETS.CONFIGER)
-        self.max_iters = cfg.SOLVER.MAX_ITER + 10
-        self.dls = get_DALI_data_loader(self.configer, aux_mode)
-        self.n = 0
-        self.dataset_id = dataset_id
-        self.aux_mode = aux_mode
+# class DaLiLoaderAdapter:
+#     def __init__(self, cfg, aux_mode='train', dataset_id=None) -> None:
+#         self.configer = Configer(configs=cfg.DATASETS.CONFIGER)
+#         self.max_iters = cfg.SOLVER.MAX_ITER + 10
+#         self.dls = get_DALI_data_loader(self.configer, aux_mode)
+#         self.n = 0
+#         self.dataset_id = dataset_id
+#         self.aux_mode = aux_mode
     
-    def __iter__(self):
-        self.n = 0
-        if self.aux_mode == 'train':
-            self.dl_iters = [iter(dl) for dl in self.dls]
-        else:
-            self.dl_iters = [iter(self.dls[self.dataset_id])]
-        return self
+#     def __iter__(self):
+#         self.n = 0
+#         if self.aux_mode == 'train':
+#             self.dl_iters = [iter(dl) for dl in self.dls]
+#         else:
+#             self.dl_iters = [iter(self.dls[self.dataset_id])]
+#         return self
     
-    def __len__(self):
-        if self.aux_mode == 'train':
-            return self.max_iters
-        else:
-            return len(self.dl_iters[0])
+#     def __len__(self):
+#         if self.aux_mode == 'train':
+#             return self.max_iters
+#         else:
+#             return len(self.dl_iters[0])
         
     
-    def __next__(self):
-        self.n += 1
-        if self.n < self.__len__():
-            ims = []
-            lbs = []
-            for j in range(0,len(self.dl_iters)):
+#     def __next__(self):
+#         self.n += 1
+#         if self.n < self.__len__():
+#             ims = []
+#             lbs = []
+#             for j in range(0,len(self.dl_iters)):
 
-                if self.aux_mode == 'train':
-                    try:
-                        data = next(self.dl_iters[j])
-                        im = data[0]['data']
-                        lb = data[0]['label']
-                        if not im.size()[0] == self.configer.get('dataset'+str(j+1), 'ims_per_gpu'):
-                            raise StopIteration
-                        while torch.min(lb) == 255:
-                            data = next(self.dl_iters[j])
-                            im = data[0]['data']
-                            lb = data[0]['label']
-                            if not im.size()[0] == self.configer.get('dataset'+str(j+1), 'ims_per_gpu'):
-                                raise StopIteration
+#                 if self.aux_mode == 'train':
+#                     try:
+#                         data = next(self.dl_iters[j])
+#                         im = data[0]['data']
+#                         lb = data[0]['label']
+#                         if not im.size()[0] == self.configer.get('dataset'+str(j+1), 'ims_per_gpu'):
+#                             raise StopIteration
+#                         while torch.min(lb) == 255:
+#                             data = next(self.dl_iters[j])
+#                             im = data[0]['data']
+#                             lb = data[0]['label']
+#                             if not im.size()[0] == self.configer.get('dataset'+str(j+1), 'ims_per_gpu'):
+#                                 raise StopIteration
 
 
-                    except StopIteration:
-                        self.dl_iters[j] = iter(self.dls[j])
-                        data = next(self.dl_iters[j])
-                        im = data[0]['data']
-                        lb = data[0]['label']
-                        while torch.min(lb) == 255:
-                            print(f"{j}:stop while")
-                            data = next(self.dl_iters[j])
-                            im = data[0]['data']
-                            lb = data[0]['label']
-                else:
-                    data = next(self.dl_iters[j])
-                    im = data[0]['data']
-                    lb = data[0]['label']
+#                     except StopIteration:
+#                         self.dl_iters[j] = iter(self.dls[j])
+#                         data = next(self.dl_iters[j])
+#                         im = data[0]['data']
+#                         lb = data[0]['label']
+#                         while torch.min(lb) == 255:
+#                             print(f"{j}:stop while")
+#                             data = next(self.dl_iters[j])
+#                             im = data[0]['data']
+#                             lb = data[0]['label']
+#                 else:
+#                     data = next(self.dl_iters[j])
+#                     im = data[0]['data']
+#                     lb = data[0]['label']
                             
-                ims.append(im)
-                lbs.append(lb)
+#                 ims.append(im)
+#                 lbs.append(lb)
                 
                         
-            im = torch.cat(ims, dim=0)
-            lb = torch.cat(lbs, dim=0)
-            im = im.permute(0,3,1,2).contiguous()
+#             im = torch.cat(ims, dim=0)
+#             lb = torch.cat(lbs, dim=0)
+#             im = im.permute(0,3,1,2).contiguous()
 
-            if self.aux_mode == 'train':
-                dataset_lbs = torch.cat([i*torch.ones(this_lb.shape[0], dtype=torch.int) for i,this_lb in enumerate(lbs)], dim=0)
-            else:
-                dataset_lbs = self.dataset_id
-            lb = torch.squeeze(lb, 3).long()
-            batch_inputs = {
-                'image': im,
-                'sem_seg': lb,
-                'dataset_lbs': dataset_lbs
-            }
-            return batch_inputs
-        else:
-            raise StopIteration
+#             if self.aux_mode == 'train':
+#                 dataset_lbs = torch.cat([i*torch.ones(this_lb.shape[0], dtype=torch.int) for i,this_lb in enumerate(lbs)], dim=0)
+#             else:
+#                 dataset_lbs = self.dataset_id
+#             lb = torch.squeeze(lb, 3).long()
+#             batch_inputs = {
+#                 'image': im,
+#                 'sem_seg': lb,
+#                 'dataset_lbs': dataset_lbs
+#             }
+#             return batch_inputs
+#         else:
+#             raise StopIteration
         
     
 

@@ -168,16 +168,29 @@ class HRNet_W48_Mseg_ARCH(nn.Module):
 
         processed_results = []
         for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
-            if self.mseg_bipart[dataset_lbs] is not None:
-                logit = torch.einsum('chw, cn -> nhw', logit, self.mseg_bipart[dataset_lbs])
-                
+      
             height = input_per_image.get("height", image_size[0])
             width = input_per_image.get("width", image_size[1])
-            logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+            # logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+            logit = F.interpolate(logit, size=(height, width), mode="bilinear", align_corners=True)
             # logits = F.interpolate(outputs['logits'], size=(batched_inputs[0]["image"].shape[-2], batched_inputs[0]["image"].shape[-1]), mode="bilinear", align_corners=True)
-            logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+            # logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+            if self.mseg_bipart[dataset_lbs] is not None:
+                # logger.info(f"logits shape: {logit.shape}")
+                preds = torch.argmax(logit, dim=0, keepdim=True).long()
+                this_mseg_map = self.mseg_bipart[dataset_lbs]
+    
+                preds = this_mseg_map[preds].long()
+                    # 创建一个与原张量相同大小的全零张量
+                output = torch.zeros(int(max(this_mseg_map)), logit.shape[1], logit.shape[2]).cuda()
+                
+                # 将最大值所在位置置为 1
+                output.scatter_(0, preds, 1)
+                processed_results.append({"sem_seg": output})
+            else: 
+          
             # logger.info(f"logit shape:{logit.shape}")
-            processed_results.append({"sem_seg": logit})
+                processed_results.append({"sem_seg": logit})
         return processed_results
             
 
@@ -385,11 +398,14 @@ class HRNet_W48_Mseg_ARCH(nn.Module):
                 meta = MetadataCatalog.get(self.datasets_names[dataset_id])        
                 stuff_classes = meta.stuff_classes
                 trainId_to_msegId = meta.trainId_to_msegId
-                this_bipart = torch.zeros((self.datasets_cats[dataset_id],len(stuff_classes)))
+                this_bipart = len(stuff_classes)*torch.ones(512)
                 for k, v in trainId_to_msegId.items():
-                    if k==255 or v ==255:
-                        continue
-                    this_bipart[k][v] = 1
+                    if v == 255:
+                        this_bipart[k] = len(stuff_classes)
+                    else:
+                        this_bipart[k] = v
+
+                logger.info(f'this_bipart:{this_bipart}')
                 self.mseg_bipart.append(this_bipart.cuda())
             else:
                 self.mseg_bipart.append(None)

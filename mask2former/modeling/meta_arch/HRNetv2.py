@@ -162,7 +162,7 @@ class HRNet_W48(nn.Module):
             
 
         self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
-                                requires_grad=True)
+                                requires_grad=False)
         trunc_normal_(self.unify_prototype, std=0.02)
         
         self.with_datasets_aux = with_datasets_aux
@@ -416,6 +416,7 @@ class HRNet_W48(nn.Module):
                 text_feature_vecs.append(text_features)
                 
         text_feature_vecs = torch.cat(text_feature_vecs, dim=0)
+        print(f"text_feature shape:{text_feature_vecs.shape}")
         self.unify_prototype.data = text_feature_vecs
         self.unify_prototype.requires_grad=False
                 

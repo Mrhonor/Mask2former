@@ -1,0 +1,70 @@
+_Curb__curb_, , 2, , 13, 
+_Parking__drivable fallback or parking_, , 10, , 1, 
+_Ground Animal___pickup, , 1, , , 20
+_Lane Marking - General___road-marking, , 24, , , 24
+_Street Light___street-light, , 43, , , 23
+_Caravan___van, , 55, , , 21
+_Ego Vehicle___ego vehicle, , 63, , , 0
+train_On Rails_train__, 16, 57, 16, , 
+_Guard Rail__guard rail_guard rail, , 4, , 16, 6
+_Billboard__billboard_billboard, , 35, , 17, 22
+rider__rider_out of roi or rider_rider, 12, , 12, 5, 14
+road_Road_road_road_road, 0, 13, 0, 0, 1
+sidewalk_Sidewalk_sidewalk_sidewalk_sidewalk, 1, 15, 1, 2, 2
+building_Building_building_building_building, 2, 17, 2, 22, 3
+wall_Wall_wall_wall_wall, 3, 6, 3, 14, 4
+fence_Fence_fence_fence_fence, 4, 3, 4, 15, 5
+pole_Pole_pole_polegroup or pole_pole, 5, 44, 5, 20, 7
+traffic light_Traffic Light_traffic light_traffic light_traffic light, 6, 47, 6, 19, 8
+traffic sign_Traffic Sign (Front)_traffic sign_traffic sign_traffic sign, 7, 49, 7, 18, 9
+vegetation_Vegetation_vegetation_vegetation_vegetation, 8, 30, 8, 24, 10
+terrain_Terrain_terrain_non-drivable fallback or rail track_terrain, 9, 29, 9, 3, 11
+sky_Sky_sky_sky or fallback background_sky, 10, 27, 10, 25, 12
+person_Person_person_person or animal_person, 11, 19, 11, 4, 13
+car_Car_car_car_car, 13, 54, 13, 9, 15
+truck_Truck_truck_truck_truck, 14, 60, 14, 10, 16
+bus_Bus_bus_bus_bus, 15, 53, 15, 11, 17
+motorcycle_Motorcycle_motorcycle_motorcycle_motorcycle, 17, 56, 17, 6, 18
+bicycle_Bicycle_bicycle_bicycle_bicycle, 18, 51, 18, 7, 19
+_Bird___, , 0, , , 
+_Barrier___, , 5, , , 
+_Bike Lane___, , 7, , , 
+_Crosswalk - Plain___, , 8, , , 
+_Curb Cut___, , 9, , , 
+_Pedestrian Area___, , 11, , , 
+_Rail Track___, , 12, , , 
+_Service Lane___, , 14, , , 
+_Bridge___, , 16, , , 
+_Tunnel___, , 18, , , 
+_Bicyclist___, , 20, , , 
+_Motorcyclist___, , 21, , , 
+_Other Rider___, , 22, , , 
+_Lane Marking - Crosswalk___, , 23, , , 
+_Mountain___, , 25, , , 
+_Sand___, , 26, , , 
+_Snow___, , 28, , , 
+_Water___, , 31, , , 
+_Banner___, , 32, , , 
+_Bench___, , 33, , , 
+_Bike Rack___, , 34, , , 
+_Catch Basin___, , 36, , , 
+_CCTV Camera___, , 37, , , 
+_Fire Hydrant___, , 38, , , 
+_Junction Box___, , 39, , , 
+_Manhole___, , 40, , , 
+_Phone Booth___, , 41, , , 
+_Pothole___, , 42, , , 
+_Traffic Sign Frame___, , 45, , , 
+_Utility Pole___, , 46, , , 
+_Traffic Sign (Back)___, , 48, , , 
+_Trash Can___, , 50, , , 
+_Boat___, , 52, , , 
+_Other Vehicle___, , 58, , , 
+_Trailer___, , 59, , , 
+_Wheeled Slow___, , 61, , , 
+_Car Mount___, , 62, , , 
+___autorickshaw_, , , , 8, 
+___trailer or caravan or vehicle fallback_, , , , 12, 
+___obs-str-bar-fallback_, , , , 21, 
+___tunnel or bridge_, , , , 23, 
+____void, , , , , 25

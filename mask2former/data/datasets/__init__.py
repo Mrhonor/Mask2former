@@ -15,5 +15,6 @@ from . import (
     register_mapi,
     register_ade,
     register_kitti,
-    register_wilddash
+    register_wilddash,
+    register_uni
 )

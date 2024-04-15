@@ -74,9 +74,14 @@ def register_cs():
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
+    stuff_colors = []
+    cur_id = 0
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
-
+        if el['trainId'] == cur_id:
+            cur_id += 1
+            stuff_colors.append(el['color'])
+    
     name = f"cs_sem_seg_val"
     DatasetCatalog.register(
         name, cs
@@ -86,6 +91,7 @@ def register_cs():
         stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors=stuff_colors,
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
@@ -123,8 +129,13 @@ def register_cs_train():
     # for name, dirname in [("train", "train"), ("val", "val")]:
     # dirname = 'train'
     lb_map = {}
+    stuff_colors = []
+    cur_id = 0
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
+        if el['trainId'] == cur_id:
+            cur_id += 1
+            stuff_colors.append(el['color'])
     for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
         name = f"cs_sem_seg_{n}"
         annpath = f'mask2former/datasets/Cityscapes/{anp}.txt'
@@ -136,6 +147,7 @@ def register_cs_train():
             stuff_classes=["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"],
             stuff_dataset_id_to_contiguous_id=lb_map,
             thing_dataset_id_to_contiguous_id=lb_map,
+            stuff_colors=stuff_colors,
             evaluator_type="sem_seg",
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )

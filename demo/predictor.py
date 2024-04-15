@@ -26,6 +26,9 @@ class VisualizationDemo(object):
         self.metadata = MetadataCatalog.get(
             cfg.DATASETS.TEST[0] if len(cfg.DATASETS.TEST) else "__unused"
         )
+        self.metadata_uni = MetadataCatalog.get(
+            "uni"
+        )
         self.cpu_device = torch.device("cpu")
         self.instance_mode = instance_mode
 
@@ -50,6 +53,7 @@ class VisualizationDemo(object):
         # Convert image from OpenCV BGR format to Matplotlib RGB format.
         image = image[:, :, ::-1]
         visualizer = Visualizer(image, self.metadata, instance_mode=self.instance_mode)
+        visualizer_uni = Visualizer(image, self.metadata_uni, instance_mode=self.instance_mode)
         if "panoptic_seg" in predictions:
             panoptic_seg, segments_info = predictions["panoptic_seg"]
             vis_output = visualizer.draw_panoptic_seg_predictions(
@@ -60,11 +64,14 @@ class VisualizationDemo(object):
                 vis_output = visualizer.draw_sem_seg(
                     predictions["sem_seg"].argmax(dim=0).to(self.cpu_device)
                 )
+                vis_output_uni = visualizer_uni.draw_sem_seg(
+                    predictions["uni_logits"].argmax(dim=0).to(self.cpu_device)
+                )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)
                 vis_output = visualizer.draw_instance_predictions(predictions=instances)
 
-        return predictions, vis_output
+        return predictions, vis_output, vis_output_uni
 
     def _frame_from_video(self, video):
         while video.isOpened():

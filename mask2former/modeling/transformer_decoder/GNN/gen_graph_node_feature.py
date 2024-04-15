@@ -21,6 +21,259 @@ import pickle
 from tqdm import tqdm
 import torch.distributed as dist
 from ....utils.configer import Configer
+# from configer import Configer
+from torch.utils.data import Dataset, DataLoader
+import torch.distributed as dist
+from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
+
+class BaseDataset(Dataset):
+    '''
+    '''
+    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+        super(BaseDataset, self).__init__()
+        # assert mode in ('train', 'eval', 'test')
+        self.mode = mode
+        self.trans_func = trans_func
+
+        self.lb_map = None
+
+        with open(annpath, 'r') as fr:
+            pairs = fr.read().splitlines()
+        self.img_paths, self.lb_paths = [], []
+        for pair in pairs:
+            imgpth, lbpth = pair.split(',')
+            self.img_paths.append(osp.join(dataroot, imgpth))
+            self.lb_paths.append(osp.join(dataroot, lbpth))
+
+        assert len(self.img_paths) == len(self.lb_paths)
+        self.len = len(self.img_paths)
+
+    def __getitem__(self, idx):
+        impth, lbpth = self.img_paths[idx], self.lb_paths[idx]        
+        label = self.get_label(lbpth)
+        if not self.lb_map is None:
+            label = self.lb_map[label]
+        if self.mode == 'ret_path':
+            return impth, label, lbpth
+
+        img = self.get_image(impth)
+
+        im_lb = dict(im=img, lb=label)
+        if not self.trans_func is None:
+            im_lb = self.trans_func(im_lb)
+            
+        im_lb = self.to_tensor(im_lb)
+        img, label = im_lb['im'], im_lb['lb']
+        # self.to_tensor = T.ToTensorCUDA(
+        #     mean=(0.3038, 0.3383, 0.3034), # city, rgb
+        #     std=(0.2071, 0.2088, 0.2090),
+        # )
+        # img, label = self.to_tensor(img, label)
+        # return img.copy(), label[None].copy()
+        
+        return img.detach(), label.unsqueeze(0).detach()
+        # return img.detach()
+
+    def get_label(self, lbpth):
+        return cv2.imread(lbpth, 0)
+
+    def get_image(self, impth):
+        img = cv2.imread(impth)[:, :, ::-1]
+        return img
+
+    def __len__(self):
+        return self.len
+
+class ToTensor(object):
+    '''
+    mean and std should be of the channel order 'bgr'
+    '''
+    def __init__(self, mean=(0, 0, 0), std=(1., 1., 1.)):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, im_lb):
+        im, lb = im_lb['im'], im_lb['lb']
+        im = im.transpose(2, 0, 1).astype(np.float32)
+        im = torch.from_numpy(im).div_(255)
+        dtype, device = im.dtype, im.device
+        mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
+        std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
+        im = im.sub_(mean).div_(std).clone()
+        if not lb is None:
+            lb = torch.from_numpy(lb.astype(np.int64))#.clone()
+        return dict(im=im, lb=lb)
+
+labels_info = [{'name': 'unlabeled', 'id': 0, 'evaluate': False, 'trainId': 255},
+{'name': 'egovehicle', 'id': 1, 'evaluate': True, 'trainId': 0}, 
+{'name': 'overlay', 'id': 2, 'evaluate': False, 'trainId': 255},
+{'name': 'outofroi', 'id': 3, 'evaluate': False, 'trainId': 255},
+{'name': 'static', 'id': 4, 'evaluate': False, 'trainId': 255},
+{'name': 'dynamic', 'id': 5, 'evaluate': False, 'trainId': 255},
+{'name': 'ground', 'id': 6, 'evaluate': False, 'trainId': 255},
+{'name': 'road', 'id': 7, 'evaluate': True, 'trainId': 1},
+{'name': 'sidewalk', 'id': 8, 'evaluate': True, 'trainId': 2},
+{'name': 'parking', 'id': 9, 'evaluate': False, 'trainId': 255},
+{'name': 'railtrack', 'id': 10, 'evaluate': False, 'trainId': 255},
+{'name': 'building', 'id': 11, 'evaluate': True, 'trainId': 3},
+{'name': 'wall', 'id': 12, 'evaluate': True, 'trainId': 4},
+{'name': 'fence', 'id': 13, 'evaluate': True, 'trainId': 5},
+{'name': 'guardrail', 'id': 14, 'evaluate': True, 'trainId': 6},
+{'name': 'bridge', 'id': 15, 'evaluate': False, 'trainId': 255},
+{'name': 'tunnel', 'id': 16, 'evaluate': False, 'trainId': 255},
+{'name': 'pole', 'id': 17, 'evaluate': True, 'trainId': 7},
+{'name': 'polegroup', 'id': 18, 'evaluate': False, 'trainId': 255},
+{'name': 'trafficlight', 'id': 19, 'evaluate': True, 'trainId': 8},
+{'name': 'trafficsignfront', 'id': 20, 'evaluate': True, 'trainId': 9},
+{'name': 'vegetation', 'id': 21, 'evaluate': True, 'trainId': 10},
+{'name': 'terrain', 'id': 22, 'evaluate': True, 'trainId': 11},
+{'name': 'sky', 'id': 23, 'evaluate': True, 'trainId': 12},
+{'name': 'person', 'id': 24, 'evaluate': True, 'trainId': 13},
+{'name': 'rider', 'id': 25, 'evaluate': True, 'trainId': 14},
+{'name': 'car', 'id': 26, 'evaluate': True, 'trainId': 15},
+{'name': 'truck', 'id': 27, 'evaluate': True, 'trainId': 16},
+{'name': 'bus', 'id': 28, 'evaluate': True, 'trainId': 17},
+{'name': 'caravan', 'id': 29, 'evaluate': False, 'trainId': 255},
+{'name': 'trailer', 'id': 30, 'evaluate': False, 'trainId': 255},
+{'name': 'onrails', 'id': 31, 'evaluate': False, 'trainId': 255},
+{'name': 'motorcycle', 'id': 32, 'evaluate': True, 'trainId': 18},
+{'name': 'bicycle', 'id': 33, 'evaluate': True, 'trainId': 19},
+{'name': 'pickup', 'id': 34, 'evaluate': True, 'trainId': 20},
+{'name': 'van', 'id': 35, 'evaluate': True, 'trainId': 21},
+{'name': 'billboard', 'id': 36, 'evaluate': True, 'trainId': 22},
+{'name': 'streetlight', 'id': 37, 'evaluate': True, 'trainId': 23},
+{'name': 'roadmarking', 'id': 38, 'evaluate': True, 'trainId': 24},
+{'name': 'junctionbox', 'id': 39, 'evaluate': False,'trainId': 255},
+{'name': 'mailbox', 'id': 40, 'evaluate': False, 'trainId': 255},
+{'name': 'manhole', 'id': 41, 'evaluate': False, 'trainId': 255},
+{'name': 'phonebooth', 'id': 42, 'evaluate': False, 'trainId': 255},
+{'name': 'pothole', 'id': 43, 'evaluate': False, 'trainId': 255},
+{'name': 'bikerack', 'id': 44, 'evaluate': False, 'trainId': 255},
+{'name': 'trafficsignframe', 'id': 45, 'evaluate': True, 'trainId': 25},
+{'name': 'utilitypole', 'id': 46, 'evaluate': True, 'trainId': 26},
+{'name': 'motorcyclist', 'id': 47, 'evaluate': True, 'trainId': 14},
+{'name': 'bicyclist', 'id': 48, 'evaluate': True, 'trainId': 14},
+{'name': 'otherrider', 'id': 49, 'evaluate': True, 'trainId': 14},
+{'name': 'bird', 'id': 50, 'evaluate': True, 'trainId': 30},
+{'name': 'groundanimal', 'id': 51, 'evaluate': True, 'trainId': 31},
+{'name': 'curb', 'id': 52, 'evaluate': True, 'trainId': 32},
+{'name': 'trafficsignany', 'id': 53, 'evaluate': True, 'trainId': 33},
+{'name': 'trafficsignback', 'id': 54, 'evaluate': True, 'trainId': 34},
+{'name': 'trashcan', 'id': 55, 'evaluate': True, 'trainId': 35},
+{'name': 'otherbarrier', 'id': 56, 'evaluate': True, 'trainId': 36},
+{'name': 'othervehicle', 'id': 57, 'evaluate': True, 'trainId': 37},
+{'name': 'autorickshaw', 'id': 58, 'evaluate': True, 'trainId': 38},
+{'name': 'bench', 'id': 59, 'evaluate': True, 'trainId': 39},
+{'name': 'mountain', 'id': 60, 'evaluate': True, 'trainId': 40},
+{'name': 'tramtrack', 'id': 61, 'evaluate': True, 'trainId': 41},
+{'name': 'wheeledslow', 'id': 62, 'evaluate': True, 'trainId': 42},
+{'name': 'boat', 'id': 63, 'evaluate': True, 'trainId': 43},
+{'name': 'bikelane', 'id': 64, 'evaluate': True, 'trainId': 44},
+{'name': 'bikelanesidewalk', 'id': 65, 'evaluate': True, 'trainId': 45},
+{'name': 'banner', 'id': 66, 'evaluate': True, 'trainId': 46},
+{'name': 'dashcammount', 'id': 67, 'evaluate': True, 'trainId': 47},
+{'name': 'water', 'id': 68, 'evaluate': False, 'trainId': 255},
+{'name': 'sand', 'id': 69, 'evaluate': False, 'trainId': 255},
+{'name': 'pedestrianarea', 'id': 70, 'evaluate': True, 'trainId': 48},
+{'name': 'firehydrant', 'id': 71, 'evaluate': False, 'trainId': 255},
+{'name': 'cctvcamera', 'id': 72, 'evaluate': False, 'trainId': 255},
+{'name': 'snow', 'id': 73, 'evaluate': False, 'trainId': 255},
+{'name': 'catchbasin', 'id': 74, 'evaluate': False, 'trainId': 255},
+{'name': 'crosswalkplain', 'id': 75, 'evaluate': True, 'trainId': 49},
+{'name': 'crosswalkzebra', 'id': 76, 'evaluate': True, 'trainId': 50},
+{'name': 'manholesidewalk', 'id': 77, 'evaluate': False, 'trainId': 255},
+{'name': 'curbterrain', 'id': 78, 'evaluate': False, 'trainId': 255},
+{'name': 'servicelane', 'id': 79, 'evaluate': False, 'trainId': 255},
+{'name': 'curbcut', 'id': 80, 'evaluate': False, 'trainId': 255}]
+
+class wd2(BaseDataset):
+    '''
+    '''
+    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+        super(wd2, self).__init__(
+                dataroot, annpath, trans_func, mode)
+    
+        
+        self.n_cats = 26
+        
+        self.lb_ignore = -1
+        # self.lb_ignore = 255
+        self.lb_map = np.arange(256).astype(np.uint8)
+        
+        self.labels_info = labels_info
+            
+        for el in self.labels_info:
+            if el['trainId'] > 24:
+                self.lb_map[el['id']] = 25 #el['trainId']
+            else:
+                self.lb_map[el['id']] = el['trainId']
+            # self.lb_map[el['id']] = el['trainId']
+
+        self.to_tensor = ToTensor(
+            mean=(0.3038, 0.3383, 0.3034), # city, rgb
+            std=(0.2071, 0.2088, 0.2090),
+        )
+
+class TransformationVal(object):
+
+    def __call__(self, im_lb):
+        im, lb = im_lb['im'], im_lb['lb']
+        return dict(im=im, lb=lb)
+
+def get_data_loader(configer, aux_mode='eval', distributed=True, stage=None):
+    mode = aux_mode
+    n_datasets = configer.get('n_datasets')
+    max_iter = configer.get('lr', 'max_iter')
+    
+    if mode == 'eval':
+        trans_func = TransformationVal()
+        batchsize = [configer.get('dataset'+str(i), 'eval_ims_per_gpu') for i in range(1, n_datasets+1)]
+        annpath = [configer.get('dataset'+str(i), 'val_im_anns') for i in range(1, n_datasets+1)]
+        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+        data_reader = [configer.get('dataset'+str(i), 'data_reader') for i in range(1, n_datasets+1)]
+        
+        shuffle = False
+        drop_last = False
+    elif mode == 'ret_path':
+        trans_func = TransformationVal()
+        batchsize = [1 for i in range(1, n_datasets+1)]
+        if stage != None:
+            annpath = [configer.get('dataset'+str(i), 'train_im_anns').replace('.txt', f'_{stage}.txt') for i in range(1, n_datasets+1)]
+            print(annpath)
+        else:
+            annpath = [configer.get('dataset'+str(i), 'train_im_anns') for i in range(1, n_datasets+1)]
+            
+        imroot = [configer.get('dataset'+str(i), 'im_root') for i in range(1, n_datasets+1)]
+        data_reader = [configer.get('dataset'+str(i), 'data_reader') for i in range(1, n_datasets+1)]
+        
+        shuffle = False
+        drop_last = False
+        
+    
+    ds = []
+    for reader, root, path in zip(data_reader, imroot, annpath):
+
+        ds.append(eval(reader)(root, path, trans_func=trans_func, mode=mode))
+    # ds = [eval(reader)(root, path, trans_func=trans_func, mode=mode)
+    #       for reader, root, path in zip(data_reader, imroot, annpath)]
+
+    dl = []
+    for idx in range(len(ds)):
+        dataset = ds[idx]
+        bs = batchsize[idx]
+            
+
+        dl.append(DataLoader(
+            dataset,
+            batch_size=bs,
+            shuffle=shuffle,
+            drop_last=drop_last,
+            num_workers=4,
+            pin_memory=True,
+            # prefetch_factor=4
+            ))
+    return dl
+
 
 class ToTensor(object):
     '''
@@ -49,7 +302,7 @@ def get_img_for_everyclass(configer, dataset_id=None):
     for i in range(1, n_datasets + 1):
         num_classes.append(configer.get("dataset" + str(i), "n_cats"))
 
-    dls = get_data_loader(configer, aux_mode='ret_path', distributed=False, stage=2)
+    dls = get_data_loader(configer, aux_mode='ret_path', distributed=False)
 
     img_lists = []
     lb_lists  = []
@@ -426,6 +679,61 @@ def gen_image_features_storage(configer, dataset_id):
 
 
 def get_encode_lb_vec(configer, datasets_id=None):
+    ori_model_path = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/mr_22210240239/llama-2-7b-hf'
+    # param_json = 'llama-2-7b/params.json'
+    config_kwargs = {
+        "trust_remote_code": True,
+        # "cache_dir": './llama-2-7b-hf',
+        "revision": 'main',
+        # "use_auth_token": None,
+        "output_hidden_states": True
+    }
+    tokenizer = AutoTokenizer.from_pretrained(ori_model_path)
+    config = AutoConfig.from_pretrained(ori_model_path, **config_kwargs)
+
+    llama_model = AutoModelForCausalLM.from_pretrained(
+        ori_model_path,
+        config=config,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+        trust_remote_code=True,
+        revision='main',
+    ).cuda()
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        llama_model.resize_token_embeddings(len(tokenizer))
+    n_datasets = configer.get('n_datasets')
+    text_feature_vecs_all = []
+    with torch.no_grad():
+        # clip_model, _ = clip.load("ViT-B/32", device="cuda")
+        for i in range(0, n_datasets):
+            text_feature_vecs = []
+            if datasets_id != None and i != datasets_id:
+                continue
+            lb_name = configer.get("dataset"+str(i+1), "label_names")
+            for lb in lb_name:
+                tokens = tokenizer.encode_plus(lb, add_special_tokens=True, padding='max_length', truncation=True,
+                                        max_length=128, return_tensors='pt')
+                input_ids = tokens["input_ids"]
+                attention_mask = tokens['attention_mask']
+                outputs = llama_model(input_ids=input_ids.cuda(), attention_mask=attention_mask.cuda())
+                # embedding = list(outputs.hidden_states)
+                
+                hidden_states = outputs.hidden_states
+                last_hidden_states = hidden_states[-1].squeeze()
+                # fisrt_larst_avg_status = last_hidden_states.mean(dim=0)
+                first_hidden_states = hidden_states[0].squeeze()
+                # print(hidden_states.shape)
+                # 计算平均状态
+                fisrt_larst_avg_status = (first_hidden_states + last_hidden_states).mean(dim=0)
+                text_feature_vecs.append(fisrt_larst_avg_status[None])
+            text_feature_vecs = torch.cat(text_feature_vecs, dim=0)
+            text_feature_vecs_all.append(text_feature_vecs)
+            # text_feature_vecs.append(text_features)
+            
+    return text_feature_vecs_all
+                
+def get_encode_lb_vec_clip(configer, datasets_id=None):
     n_datasets = configer.get('n_datasets')
     text_feature_vecs = []
     with torch.no_grad():
@@ -440,9 +748,48 @@ def get_encode_lb_vec(configer, datasets_id=None):
             text_feature_vecs.append(text_features)
             
     return text_feature_vecs
-                
+    
 def gen_graph_node_feature(cfg):
     configer = Configer(configs=cfg.DATASETS.CONFIGER)
+    n_datasets = configer.get("n_datasets")
+    save_pth = 'output/'
+    if not osp.exists(save_pth): os.makedirs(save_pth)
+    
+    file_name = save_pth + 'graph_node_features_llama'
+    dataset_names = []
+    for i in range(0, configer.get('n_datasets')):
+        # file_name += '_'+str(configer.get('dataset'+str(i+1), 'data_reader'))
+        dataset_names.append(str(configer.get('dataset'+str(i+1), 'data_reader')))
+    
+    # file_name += '.pt'
+    out_features = []
+    for i in range(0, n_datasets):
+        this_file_name = file_name + f'_{dataset_names[i]}.pt' 
+        if osp.exists(this_file_name):
+            this_graph_node_features = torch.load(this_file_name, map_location='cpu')
+
+            out_features.append(this_graph_node_features)
+        else:
+            print(f'gen_graph_node_featuer: {i}')
+            # img_feature_vecs = gen_image_features(configer, i)
+            # img_feat_tensor = torch.cat(img_feature_vecs, dim=0)
+            
+            text_feature_vecs = get_encode_lb_vec(configer, i)[0]
+            # this_graph_node_features = torch.cat([text_feature_vecs, img_feat_tensor], dim=1)
+            
+            print("gen finished")
+            torch.save(text_feature_vecs.clone(), this_file_name)
+
+            out_features.append(text_feature_vecs.cpu())
+    
+    out_features = torch.cat(out_features, dim=0)
+    print(out_features.shape)
+    return out_features 
+    
+                
+def gen_graph_node_feature_clip(cfg):
+    configer = Configer(configs=cfg.DATASETS.CONFIGER)
+    # configer = cfg
     n_datasets = configer.get("n_datasets")
     save_pth = 'output/'
     if not osp.exists(save_pth): os.makedirs(save_pth)
@@ -462,7 +809,7 @@ def gen_graph_node_feature(cfg):
 
             out_features.append(this_graph_node_features)
         else:
-            raise Exception("Not Imp!")
+            # raise Exception("Not Imp!")
             print(f'gen_graph_node_featuer: {i}')
             img_feature_vecs = gen_image_features(configer, i)
             img_feat_tensor = torch.cat(img_feature_vecs, dim=0)
@@ -507,103 +854,12 @@ def gen_graph_node_feature(cfg):
     
     # return graph_node_features
 
-    
-def gen_graph_node_feature_single(configer, img_feature_vecs, text_feat_tensor=None):
-    if text_feat_tensor is None:
-        text_feature_vecs = get_encode_lb_vec(configer)
-        text_feat_tensor = torch.cat(text_feature_vecs, dim=0)
 
-    # img_feature_vecs, lbpth_list = gen_image_features_single(configer, dls, gen_feature)
-    n_datasets = configer.get("n_datasets")
-    img_feat_tensor = []
-    for i in range(0, n_datasets):
-        n_cats = configer.get(f'dataset{i+1}', 'n_cats')
-        for j in range(0, n_cats):
-            num_samples, dim = img_feature_vecs[i][j].shape
-            if num_samples == 1:
-                img_feat_tensor.append(img_feature_vecs[i][j])
-                continue
-                
-            choice_samples = int(num_samples/2)
-            
-            # print(f'the shape of dataset{i}: ', img_feature_vecs[i][j].shape)
-            random_img_sample = random.sample(list(img_feature_vecs[i][j]), choice_samples)
-            avg_img_feat = torch.mean(torch.cat(random_img_sample).view(-1, dim), dim=0)
-            img_feat_tensor.append(avg_img_feat[None])
-    
-        
-    img_feat_tensor = torch.cat(img_feat_tensor, dim=0)
-
-    # graph_node_features = torch.cat([text_feat_tensor, img_feat_tensor], dim=1)
-    graph_node_features = (text_feat_tensor+img_feat_tensor)/2
-
-    return graph_node_features, text_feat_tensor
-
-def gen_graph_node_feature_storage(configer):
-
-    # text_feature_vecs = get_encode_lb_vec(configer)
-    # text_feat_tensor = torch.cat(text_feature_vecs, dim=0)
-    n_datasets = configer.get("n_datasets")
-    save_pth = 'output/'
-    if not osp.exists(save_pth): os.makedirs(save_pth)
-    
-    file_name = save_pth + 'img_feature_vecs'+str(configer.get('n_datasets'))
-    dataset_names = []
-    for i in range(0, configer.get('n_datasets')):
-        # file_name += '_'+str(configer.get('dataset'+str(i+1), 'data_reader'))
-        dataset_names.append(str(configer.get('dataset'+str(i+1), 'data_reader')))
-    
-    # file_name += '.pt'
-    out_features = []
-    for i in range(0, n_datasets):
-        this_file_name = file_name + f'_{dataset_names[i]}.pkl' 
-        if osp.exists(this_file_name):
-            # img_feature_vecs = torch.load(this_file_name)
-            with open(this_file_name, 'rb') as file:
-                img_feature_vecs = pickle.load(file)  
-
-            out_features.append(img_feature_vecs)
-        else:
-            print("gen_img_feature_vecs")
-            img_feature_vecs = gen_image_features_storage(configer, i)
-            print("gen finished")
-            with open(this_file_name, 'wb') as file:
-                pickle.dump(img_feature_vecs, file)
-            # _ = [torch.save(img_feature_vecs.clone(), file_name + f'_dataset{idx}.pt' ) for idx, img_feature_vecs in enumerate(out_features)]
-            out_features.append(img_feature_vecs)
-    
-    return out_features 
-
-def gen_graph_node_feature_test(configer):
-    n_datasets = configer.get("n_datasets")
-
-    if not osp.exists(save_pth): os.makedirs(save_pth)
-    
-    file_name = save_pth + 'graph_node_features'
-    dataset_names = []
-    for i in range(0, configer.get('n_datasets')):
-        # file_name += '_'+str(configer.get('dataset'+str(i+1), 'data_reader'))
-        dataset_names.append(str(configer.get('dataset'+str(i+1), 'data_reader')))
-    
-    # file_name += '.pt'
-    out_features = []
-    for i in range(0, n_datasets):
-        
-        text_feature_vecs = get_encode_lb_vec(configer, i)[0]
-        this_graph_node_features = torch.cat([text_feature_vecs, torch.zeros_like(text_feature_vecs)], dim=1)
-        
-        print("gen finished")
-
-        out_features.append(this_graph_node_features.cpu())
-    
-    out_features = torch.cat(out_features, dim=0)
-    print(out_features.shape)
-    return out_features 
 
 if __name__ == "__main__":
-    configer = Configer(configs="configs/ltbgnn_7_datasets.json")
+    configer = Configer(configs="configs/ltbgnn_5_datasets.json")
     # img_feature_vecs = gen_graph_node_feature_storage(configer) 
-    sep_train_set_for_everyclass(configer)
+    gen_graph_node_feature(configer)
     print('finished')
     # print(img_feature_vecs[0][0])
     # print(img_feature_vecs)

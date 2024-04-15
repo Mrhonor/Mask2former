@@ -56,20 +56,21 @@ class SemanticDatasetMapper:
         self.ignore_label = ignore_label
         self.size_divisibility = size_divisibility
         self.should_lookup_table = should_lookup_table
-        
+        logger = logging.getLogger(__name__)
         if self.should_lookup_table:
             self.lb_map = np.arange(256).astype(np.uint8)
             for k, v in lookup_table.items():
                 self.lb_map[k] = v
-            self.lb_maps = torch.tensor(self.lb_map)
+            # self.lb_map = torch.tensor(self.lb_map)
 
-        logger = logging.getLogger(__name__)
+        
         mode = "training" if is_train else "inference"
         logger.info(f"[{self.__class__.__name__}] Augmentations used in {mode}: {augmentations}")
 
     @classmethod
     def from_config(cls, cfg, is_train=True, dataset_id=0, should_lookup_table=False):
         # Build augmentation
+        logger = logging.getLogger(__name__)
         augs = [
             T.ResizeShortestEdge(
                 cfg.INPUT.MIN_SIZE_TRAIN,
@@ -91,8 +92,12 @@ class SemanticDatasetMapper:
         augs.append(T.RandomFlip())
 
         # Assume always applies to the training set.
-        dataset_names = cfg.DATASETS.TRAIN
+        if is_train:
+            dataset_names = cfg.DATASETS.TRAIN
+        else:
+            dataset_names = cfg.DATASETS.TEST
         meta = MetadataCatalog.get(dataset_names[dataset_id])
+    
         ignore_label = meta.ignore_label
         thing_dataset_id_to_contiguous_id = None
         if should_lookup_table:
@@ -118,7 +123,7 @@ class SemanticDatasetMapper:
             dict: a format that builtin models in detectron2 accept
         """
         # assert self.is_train, "MaskFormerSemanticDatasetMapper should only be used for training!"
-        # logger = logging.getLogger(__name__)
+        logger = logging.getLogger(__name__)
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # logger.info(f"dataset_dict: {dataset_dict}")
         image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
@@ -174,6 +179,7 @@ class SemanticDatasetMapper:
             if self.should_lookup_table:
                 sem_seg_gt = sem_seg_gt.long()
                 sem_seg_gt = self.lb_map[sem_seg_gt]
+                
                 dataset_dict["sem_seg"] = torch.as_tensor(sem_seg_gt).long()
             else:
                 dataset_dict["sem_seg"] = sem_seg_gt.long()

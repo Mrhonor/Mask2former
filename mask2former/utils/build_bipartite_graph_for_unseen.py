@@ -23,6 +23,7 @@ from detectron2.engine.hooks import HookBase
 import datetime
 from detectron2.utils.logger import log_every_n_seconds
 from .MCMF_build_for_unseen import MinCostMaxFlow_Unseen
+from detectron2.data import MetadataCatalog
 
 @contextmanager
 def inference_context(model):
@@ -53,22 +54,24 @@ def build_bipartite_graph_for_unseen(trainer_build_test_loader, cfg, model):
 
     # org_aux = net.aux_mode
 
-    bipart_graph = model.get_bipart_graph()
-    
-    datasets_cats = cfg.DATASETS.DATASETS_CATS
+    datasets_cats = []
+    for dataset_name in cfg.DATASETS.TRAIN:
+        stuff_classes = MetadataCatalog.get(dataset_name).stuff_classes
+        datasets_cats.append(len(stuff_classes))
+    #  = [11]#cfg.DATASETS.DATASETS_CATS
     n_datasets = len(datasets_cats)
     ignore_index = cfg.DATASETS.IGNORE_LB
-    total_cats = 0
     callbacks = None
-    for i in range(0, n_datasets):
-        total_cats += datasets_cats[i]
-    num_unfiy_class = cfg.DATASETS.NUM_UNIFY_CLASS
+    
     target_bipart = []
 
     for dataset_idx, dataset_name in enumerate(cfg.DATASETS.TRAIN):
         data_loader = trainer_build_test_loader(cfg, dataset_name)
 
         n_classes = datasets_cats[dataset_idx]
+        num_unfiy_class = cfg.DATASETS.NUM_UNIFY_CLASS
+        if num_unfiy_class < n_classes:
+            num_unfiy_class = n_classes
         hist = torch.zeros(n_classes, num_unfiy_class).cuda()
         # hist_origin = torch.zeros(n_classes, n_classes).cuda().detach()    
         
@@ -117,7 +120,7 @@ def build_bipartite_graph_for_unseen(trainer_build_test_loader, cfg, model):
                         preds = torch.argmax(probs, dim=1)
                         logger = logging.getLogger(__name__) 
                         keep = lb != ignore_index
-                        # logger.info(f"lb:{lb.shape}, keep:{keep.shape}, preds:{preds.shape}")
+                        
 
                         hist += torch.tensor(np.bincount(
                             lb.cpu().numpy()[keep.cpu().numpy()] * num_unfiy_class + preds.cpu().numpy()[keep.cpu().numpy()],
@@ -163,27 +166,34 @@ def build_bipartite_graph_for_unseen(trainer_build_test_loader, cfg, model):
                 )
             )                    
             
+        logger.info(hist)
+        
         cost_matrix = torch.zeros(num_unfiy_class, n_classes)
         for uni_class in range(num_unfiy_class):
             total_pres = torch.sum(hist[:, uni_class])
             for set_class in range(n_classes):
                 total_target = torch.sum(hist[set_class])
+                if total_target == 0:
+                    cost_matrix[uni_class, set_class] = 1
+                    continue
                 iou = hist[set_class, uni_class] / (total_pres + total_target - hist[set_class, uni_class])
                 cost_matrix[uni_class, set_class] = 1 - iou
-                
+        logger.info(cost_matrix)
         mcmf = MinCostMaxFlow_Unseen()
         src, target = mcmf(cost_matrix) 
         
         # torch.set_printoptions(profile="full")
         # print(hist)
+                
 
-        bipart = torch.zeros(n_classes, num_unfiy_class)
+        bipart = datasets_cats[dataset_idx] * torch.ones(448)
         for s, t in zip(src, target):
-            bipart[t,s] = 1
+            bipart[s] = t
             # buckets[index] = new_val
-        target_bipart.append(bipart)
+        logger.info(bipart)
+        target_bipart.append(bipart.cuda())
 
     # net.train()
     # target_bipart.cat(target_bipart, dim=0)
-    model.set_target_bipart(target_bipart)
+    model.set_dataset_adapter(target_bipart)
     # return graph, num_classes

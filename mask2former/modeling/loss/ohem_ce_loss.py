@@ -34,10 +34,9 @@ class OhemCELoss(nn.Module):
     
 class MdsOhemCELoss(nn.Module):
 
-    def __init__(self, configer, thresh, ignore_lb=255):
+    def __init__(self, n_datasets, thresh, ignore_lb=255):
         super(MdsOhemCELoss, self).__init__()
-        self.configer = configer
-        self.n_datasets = self.configer.get('n_datasets')
+        self.n_datasets = n_datasets
         self.thresh = -torch.log(torch.tensor(thresh, requires_grad=False, dtype=torch.float)) #.cuda()
         self.ignore_lb = ignore_lb
         self.criteria = nn.CrossEntropyLoss(ignore_index=ignore_lb, reduction='none')

@@ -23,7 +23,7 @@ from detectron2.data.detection_utils import read_image
 from detectron2.projects.deeplab import add_deeplab_config
 from detectron2.utils.logger import setup_logger
 
-from mask2former import add_maskformer2_config
+from mask2former import add_maskformer2_config, add_hrnet_config, add_gnn_config
 from predictor import VisualizationDemo
 
 
@@ -36,6 +36,8 @@ def setup_cfg(args):
     cfg = get_cfg()
     add_deeplab_config(cfg)
     add_maskformer2_config(cfg)
+    add_hrnet_config(cfg)
+    add_gnn_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()
@@ -115,7 +117,7 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img)
+            predictions, visualized_output, visual_uni_output = demo.run_on_image(img)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,
@@ -134,6 +136,7 @@ if __name__ == "__main__":
                     assert len(args.input) == 1, "Please specify a directory with args.output"
                     out_filename = args.output
                 visualized_output.save(out_filename)
+                visual_uni_output.save(out_filename.replace('.png', '_uni.png').replace('.jpg', '_uni.jpg'))
             else:
                 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
                 cv2.imshow(WINDOW_NAME, visualized_output.get_image()[:, :, ::-1])

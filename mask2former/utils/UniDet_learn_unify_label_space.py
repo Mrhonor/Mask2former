@@ -13,17 +13,31 @@ from collections import defaultdict
 from pycocotools import mask as maskutils
 import numba
 import time
-from lib.get_dataloader import get_data_loader
-from tqdm import tqdm
+
 import pickle
-from lib.models import model_factory
-from tools.configer import Configer
 from contextlib import ExitStack, contextmanager
 
 
 from detectron2.engine.hooks import HookBase
 import datetime
 from detectron2.utils.logger import log_every_n_seconds
+from detectron2.data import MetadataCatalog
+import logging
+
+@contextmanager
+def inference_context(model):
+    """
+    A context where the model is temporarily changed to eval mode,
+    and restored to previous mode afterwards.
+
+    Args:
+        model: a torch Module
+    """
+    training_mode = model.training
+    model.eval()
+    yield
+    model.train(training_mode)
+
 # # datapath 
 # ROOT_PATH = 'datasets/'
 
@@ -43,8 +57,12 @@ from detectron2.utils.logger import log_every_n_seconds
 # }
 class UniDetLearnUnifyLabelSpace(HookBase):
     @torch.no_grad()
-    def after_train(self):
-        datasets = ['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
+    def before_train(self):
+        logger = logging.getLogger(__name__)
+        logger.info("UniDetLearnUnifyLabelSpace")
+        cfg = self.trainer.cfg
+        model = self.trainer.model
+        datasets = cfg.DATASETS.EVAL # ['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
         city_lb = ["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
         mapi_lb = ["Bird", "Ground Animal", "Curb", "Fence", "Guard Rail", "Barrier", "Wall", "Bike Lane", "Crosswalk - Plain", "Curb Cut", "Parking", "Pedestrian Area", "Rail Track", "Road", "Service Lane", "Sidewalk", "Bridge", "Building", "Tunnel", "Person", "Bicyclist", "Motorcyclist", "Other Rider", "Lane Marking - Crosswalk", "Lane Marking - General", "Mountain", "Sand", "Sky", "Snow", "Terrain", "Vegetation", "Water", "Banner", "Bench", "Bike Rack", "Billboard", "Catch Basin", "CCTV Camera", "Fire Hydrant", "Junction Box", "Manhole", "Phone Booth", "Pothole", "Street Light", "Pole", "Traffic Sign Frame", "Utility Pole", "Traffic Light", "Traffic Sign (Back)", "Traffic Sign (Front)", "Trash Can", "Bicycle", "Boat", "Bus", "Car", "Caravan", "Motorcycle", "On Rails", "Other Vehicle", "Trailer", "Truck", "Wheeled Slow", "Car Mount", "Ego Vehicle"]
         sun_lb = [ "bag", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower curtain", "box", "whiteboard", "person", "night stand", "toilet", "sink", "lamp", "bathtub"]
@@ -52,10 +70,11 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         idd_lb = ["road", "drivable fallback or parking", "sidewalk", "non-drivable fallback or rail track", "person or animal", "out of roi or rider", "motorcycle", "bicycle", "autorickshaw", "car", "truck", "bus", "trailer or caravan or vehicle fallback", "curb", "wall", "fence", "guard rail", "billboard", "traffic sign", "traffic light", "polegroup or pole", "obs-str-bar-fallback", "building", "tunnel or bridge", "vegetation", "sky or fallback background"]
         ade_lb = ["flag", "wall", "building, edifice", "sky", "floor, flooring", "tree", "ceiling", "road, route", "bed ", "windowpane, window ", "grass", "cabinet", "sidewalk, pavement", "person, individual, someone, somebody, mortal, soul", "earth, ground", "door, double door", "table", "mountain, mount", "plant, flora, plant life", "curtain, drape, drapery, mantle, pall", "chair", "car, auto, automobile, machine, motorcar", "water", "painting, picture", "sofa, couch, lounge", "shelf", "house", "sea", "mirror", "rug, carpet, carpeting", "field", "armchair", "seat", "fence, fencing", "desk", "rock, stone", "wardrobe, closet, press", "lamp", "bathtub, bathing tub, bath, tub", "railing, rail", "cushion", "base, pedestal, stand", "box", "column, pillar", "signboard, sign", "chest of drawers, chest, bureau, dresser", "counter", "sand", "sink", "skyscraper", "fireplace, hearth, open fireplace", "refrigerator, icebox", "grandstand, covered stand", "path", "stairs, steps", "runway", "case, display case, showcase, vitrine", "pool table, billiard table, snooker table", "pillow", "screen door, screen", "stairway, staircase", "river", "bridge, span", "bookcase", "blind, screen", "coffee table, cocktail table", "toilet, can, commode, crapper, pot, potty, stool, throne", "flower", "book", "hill", "bench", "countertop", "stove, kitchen stove, range, kitchen range, cooking stove", "palm, palm tree", "kitchen island", "computer, computing machine, computing device, data processor, electronic computer, information processing system", "swivel chair", "boat", "bar", "arcade machine", "hovel, hut, hutch, shack, shanty", "bus, autobus, coach, charabanc, double-decker, jitney, motorbus, motorcoach, omnibus, passenger vehicle", "towel", "light, light source", "truck, motortruck", "tower", "chandelier, pendant, pendent", "awning, sunshade, sunblind", "streetlight, street lamp", "booth, cubicle, stall, kiosk", "television receiver, television, television set, tv, tv set, idiot box, boob tube, telly, goggle box", "airplane, aeroplane, plane", "dirt track", "apparel, wearing apparel, dress, clothes", "pole", "land, ground, soil", "bannister, banister, balustrade, balusters, handrail", "escalator, moving staircase, moving stairway", "ottoman, pouf, pouffe, puff, hassock", "bottle", "buffet, counter, sideboard", "poster, posting, placard, notice, bill, card", "stage", "van", "ship", "fountain", "conveyer belt, conveyor belt, conveyer, conveyor, transporter", "canopy", "washer, automatic washer, washing machine", "plaything, toy", "swimming pool, swimming bath, natatorium", "stool", "barrel, cask", "basket, handbasket", "waterfall, falls", "tent, collapsible shelter", "bag", "minibike, motorbike", "cradle", "oven", "ball", "food, solid food", "step, stair", "tank, storage tank", "trade name, brand name, brand, marque", "microwave, microwave oven", "pot, flowerpot", "animal, animate being, beast, brute, creature, fauna", "bicycle, bike, wheel, cycle ", "lake", "dishwasher, dish washer, dishwashing machine", "screen, silver screen, projection screen", "blanket, cover", "sculpture", "hood, exhaust hood", "sconce", "vase", "traffic light, traffic signal, stoplight", "tray", "ashcan, trash can, garbage can, wastebin, ash bin, ash-bin, ashbin, dustbin, trash barrel, trash bin", "fan", "pier, wharf, wharfage, dock", "crt screen", "plate", "monitor, monitoring device", "bulletin board, notice board", "shower", "radiator", "glass, drinking glass", "clock"]
         coco_lb = ["rug-merged", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"]
-
+        wilddash_lb = ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void']
+        n_datasets = len(datasets)
         # load meta data
         # categories = json.load(open(meta_data_path, 'r'))
-        num_cats = [len(eval(d+'_lb')) for d in datasets]
+        num_cats = cfg.DATASETS.DATASETS_CATS
         num_cats_by_name = {}
         for d, n_cat in zip(datasets, num_cats):
             num_cats_by_name[d] = n_cat
@@ -64,7 +83,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         dataset_range = {}
         for d, c in zip(datasets, num_cats):
             dataset_range[d] = range(cnt, cnt + c)
-        cnt = cnt + c
+            cnt = cnt + c
         print('dataset_range', dataset_range)
         id2source = np.concatenate(
             [np.ones(len(dataset_range[d]), dtype=np.int32) * i \
@@ -73,83 +92,141 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         predid2name, id2sourceid, id2sourceindex, id2sourcename = [], [], [], []
         names = []
         for d in datasets:
-            predid2name.extend([d + '_' + lb_name for lb_name in eval(d+'_lb')])
-            id2sourceid.extend([i for i in range(len(eval(d+'_lb')))])
-            id2sourceindex.extend([i for i in range(len(eval(d+'_lb')))])
-            id2sourcename.extend([d for _ in range(len(eval(d+'_lb')))])
-            names.extend([d + '_' + lb_name for lb_name in eval(d+'_lb')])
+            meta = MetadataCatalog.get(d)
+            stuff_class = meta.stuff_classes
+            predid2name.extend([d + '_' + lb_name for lb_name in stuff_class])
+            id2sourceid.extend([i for i in range(len(stuff_class))])
+            id2sourceindex.extend([i for i in range(len(stuff_class))])
+            id2sourcename.extend([d for _ in range(len(stuff_class))])
+            names.extend([d + '_' + lb_name for lb_name in stuff_class])
             # print('len(categories[d])', d, len(categories[d]))
-            
+        
         @torch.no_grad()
-        def eval_cross_head_and_datasets(net):
+        def eval_cross_head_and_datasets():
             
             ignore_label = 255
             datasets_cats = self.trainer.cfg.DATASETS.DATASETS_CATS
-            n_datasets = len(datasets_cats)
+            # n_datasets = len(datasets_cats)
             ignore_index = self.trainer.cfg.DATASETS.IGNORE_LB
             total_cats = 0
-            net.aux_mode = 'train'
-            net.eval()
-            unify_prototype = net.unify_prototype
-            # print(unify_prototype.shape)
-            bipart_graph = net.bipartite_graphs
             # is_dist = dist.is_initialized()
-            dls = get_data_loader(configer, aux_mode='train', distributed=False)
-            dataset_id = [0,1,2,3,4,5,6]
-            datasets_name = ['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
-            for i in dataset_id:
-                total_cats += datasets_cats[i]
+            # dls = get_data_loader(configer, aux_mode='train', distributed=False)
+            # dataset_id = [0,1,2,3,4,5,6]
+            datasets_name = cfg.DATASETS.EVAL#['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
+            for cat in datasets_cats:
+                total_cats += cat
             # for i in range(0, n_datasets):
             #     total_cats += configer.get("dataset"+str(i+1), "n_cats")
             # total_cats = int(total_cats * configer.get('GNN', 'unify_ratio'))
 
-            heads, mious, target_bipart = [], [], []
-            heads.append('single_scale')
+
             predHist = {}
-            for id, i in enumerate(dataset_id):
-                this_dataset_cat = datasets_cats[i]
-                n_classes = [datasets_cats[j] for j in dataset_id]
-                print(n_classes)
-                hist = [torch.zeros(this_dataset_cat, n_class) for n_class in n_classes]
+            for id, name in enumerate(datasets_name):
+                this_dataset_cat = datasets_cats[id]
+                # n_classes = total_cats
+                # print(n_classes)
+                hist = [torch.zeros(this_dataset_cat, n_class) for n_class in datasets_cats]
 
-                diter = enumerate(tqdm(dls[i]))
-                    
-                
+                data_loader = self.trainer.build_test_loader(cfg, name)
+                callbacks = None
                 with torch.no_grad():
-                    for _, (imgs, label) in diter:
+                    total = len(data_loader)
+                    num_warmup = min(5, total - 1)
+                    start_time = time.perf_counter()
+                    total_data_time = 0
+                    total_compute_time = 0
+                    total_eval_time = 0
+                    with ExitStack() as stack:
+                        if isinstance(model, nn.Module):
+                            stack.enter_context(inference_context(model))
+                        stack.enter_context(torch.no_grad())
 
+                        start_data_time = time.perf_counter()
+                        dict.get(callbacks or {}, "on_start", lambda: None)()
+                        for idx, inputs in enumerate(data_loader):
+                            total_data_time += time.perf_counter() - start_data_time
+                            if idx == num_warmup:
+                                start_time = time.perf_counter()
+                                total_data_time = 0
+                                total_compute_time = 0
+                                total_eval_time = 0
 
-                        label = label.squeeze(1).cuda()
-                        size = label.shape[-2:]
+                            start_compute_time = time.perf_counter()
+                            dict.get(callbacks or {}, "before_inference", lambda: None)()
+                            outputs = model(inputs)
+                            dict.get(callbacks or {}, "after_inference", lambda: None)()
+                            if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                            total_compute_time += time.perf_counter() - start_compute_time
 
-                        im_sc = imgs.cuda()
+                            start_eval_time = time.perf_counter()
+                            labels = [x["sem_seg"][None].cuda() for x in inputs]
+
+                            logits = [output["uni_logits"][None] for output in outputs]
+                            cnt = 0
+                            cur_id = 0
+                            for this_dataset_idx, _ in enumerate(datasets_name):
+                                this_cat = datasets_cats[this_dataset_idx] 
+                                # logger.info("this_cat")
+                                for lb, lg in zip(labels, logits):
+                                    this_lg = lg[:,cnt:cnt+this_cat,:,:]
+
+                                    this_lg = F.interpolate(this_lg, size=(lb.shape[1], lb.shape[2]), mode="bilinear", align_corners=True)
+                                    lb = lb.long()
+
+                                    probs = torch.softmax(this_lg, dim=1)
+                                    preds = torch.argmax(probs, dim=1)
+                                    
+                                    keep = lb != ignore_index
+
+                                    hist[cur_id] += torch.tensor(np.bincount(
+                                        lb.cpu().numpy()[keep.cpu().numpy()] * this_cat + preds.cpu().numpy()[keep.cpu().numpy()],
+                                        minlength=this_cat * this_dataset_cat
+                                    )).view(this_dataset_cat, this_cat)
+                                    cur_id += 1
+                                    # logits.append(this_logit)
+                                cnt += this_cat
+                            total_eval_time += time.perf_counter() - start_eval_time
+
+                            iters_after_start = idx + 1 - num_warmup * int(idx >= num_warmup)
+                            data_seconds_per_iter = total_data_time / iters_after_start
+                            compute_seconds_per_iter = total_compute_time / iters_after_start
+                            eval_seconds_per_iter = total_eval_time / iters_after_start
+                            total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
+                            if idx >= num_warmup * 2 or compute_seconds_per_iter > 5:
+                                eta = datetime.timedelta(seconds=int(total_seconds_per_iter * (total - idx - 1)))
+                                log_every_n_seconds(
+                                    logging.INFO,
+                                    (
+                                        f"Inference done {idx + 1}/{total}. "
+                                        f"Dataloading: {data_seconds_per_iter:.4f} s/iter. "
+                                        f"Inference: {compute_seconds_per_iter:.4f} s/iter. "
+                                        f"Eval: {eval_seconds_per_iter:.4f} s/iter. "
+                                        f"Total: {total_seconds_per_iter:.4f} s/iter. "
+                                        f"ETA={eta}"
+                                    ),
+                                    n=5,
+                                )
+                            start_data_time = time.perf_counter()
+                        dict.get(callbacks or {}, "on_end", lambda: None)()
                         
-                        emb = net(im_sc, dataset=i)
-                        # logits = []
-                        keep = label != ignore_label
-                        cnt = 0
-                        cur_id = 0
-                        for idx in range(n_datasets):
-                            this_cat = configer.get("dataset"+str(idx+1), "n_cats")
-                            if idx in dataset_id:
-                                # print(this_cat)
-                                this_logit = torch.einsum('bchw, nc -> bnhw', emb['seg'], unify_prototype[cnt:cnt+this_cat])
-                                this_logit = F.interpolate(this_logit, size=size,
-                                    mode='bilinear', align_corners=True)
 
-                                probs = torch.softmax(this_logit, dim=1)
-                                preds = torch.argmax(probs, dim=1)
-
-                                hist[cur_id] += torch.tensor(np.bincount(
-                                    label.cpu().numpy()[keep.cpu().numpy()] * this_cat + preds.cpu().numpy()[keep.cpu().numpy()],
-                                    minlength=this_cat * this_dataset_cat
-                                )).view(this_dataset_cat, this_cat)
-                                cur_id += 1
-                                # logits.append(this_logit)
-                            cnt += this_cat
-                                
-                                
-
+                    # Measure the time only for this worker (before the synchronization barrier)
+                    total_time = time.perf_counter() - start_time
+                    total_time_str = str(datetime.timedelta(seconds=total_time))
+                    # NOTE this format is parsed by grep
+                    logger.info(
+                        "Total inference time: {} ({:.6f} s / iter per device)".format(
+                            total_time_str, total_time / (total - num_warmup)
+                        )
+                    )
+                    total_compute_time_str = str(datetime.timedelta(seconds=int(total_compute_time)))
+                    logger.info(
+                        "Total inference pure compute time: {} ({:.6f} s / iter per device)".format(
+                            total_compute_time_str, total_compute_time / (total - num_warmup)
+                        )
+                    )                                        
+                        
                 hist_map = {}
                 for idx, name in enumerate(datasets_name):
                     hist_map[name] = hist[idx]
@@ -157,32 +234,15 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             
             return predHist
                         
-        if osp.exists("Predhist_7.pickle"):
-            with open("Predhist_7.pickle", "rb") as file:
+        if osp.exists(f"Predhist_{n_datasets}.pickle"):
+            with open(f"Predhist_{n_datasets}.pickle", "rb") as file:
                 Predhist = pickle.load(file)
+            # for name, hist in Predhist.items():
+            #     del hist[name]
         else:
-            def set_model(configer):
-                net = model_factory[configer.get('model_name')](configer)
 
-                if configer.get('train', 'finetune'):
-                    state = torch.load(configer.get('train', 'finetune_from'), map_location='cpu')
-                    
-                    if 'model_state_dict' in state:
-                        net.load_state_dict(state['model_state_dict'], strict=False)
-                    else:
-                        net.load_state_dict(state, strict=False)
-                        
-
-                    
-                if configer.get('use_sync_bn'): 
-                    net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
-                net.cuda()
-                net.train()
-                return net
-            configer = Configer(configs='configs/ltbgnn_7_datasets_snp.json')
-            net = set_model(configer)
-            Predhist = eval_cross_head_and_datasets(configer, net)
-            with open("Predhist_7.pickle", "wb") as file:
+            Predhist = eval_cross_head_and_datasets()
+            with open(f"Predhist_{n_datasets}.pickle", "wb") as file:
                 pickle.dump(Predhist, file)
 
             # 从文件中加载对象
@@ -242,7 +302,9 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             # all_anns[d] = create_index(anns['annotations'], True, 
             #                             cats=[x['id'] for x in anns['categories']])
             all_preds[d] = Predhist[d] #create_index(preds, score_thresh=0.1)
-            gtid2name[d] = eval(d+'_lb') # {x['id']: x['name'] for x in anns['categories']}
+            meta = MetadataCatalog.get(d)
+            stuff_class = meta.stuff_classes
+            gtid2name[d] = stuff_class # {x['id']: x['name'] for x in anns['categories']}
             # del anns
             # del preds
             
@@ -357,6 +419,8 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 for i in range(total_cats):
                     pred_name = predid2name[i]
                     source_D = id2sourcename[i]
+                    # logger.info(f'source_D:{source_D}, d:{d}')
+                    # logger.info(d)
                     source_id = id2sourceindex[i]
                     if source_D == d:
                         continue
@@ -453,7 +517,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
 
 
         max_new_nodes = {
-            2: 1000, 3: 1000, 4: 1500, 5:1000, 6:1000, 7:500
+            2: 3000, 3: 4000, 4: 4500, 5:4000, 6:1000, 7:500
         }
         n2 = max_new_nodes[2]
         tau = 0.2
@@ -464,6 +528,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         cnt = 0
         for d1, a in enumerate(datasets):
             for d2, b in enumerate(datasets[d1+1:]):
+                print(a,b)
                 dist = np.ones(
                     (len(dataset_range[a]), len(dataset_range[b])), dtype=np.float32) * oo
                 for i in range(len(dataset_range[a])):
@@ -492,6 +557,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             valid_two_nodes[(i, j)] = set([tuple(sorted((x[1], x[2]))) for x in nodes[(i, j)]])
             Q.append((i, j))
         print('#valid two node merge:', sum(len(v) for k, v in nodes.items()))
+        logger.info(f"valid_two_nodes:{valid_two_nodes}")
 
         # three-dataset merge
         def remove_duplicate(list1, list2):
@@ -525,6 +591,9 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                     for id, source in zip(ids, sources):
                         dataset_pair = tuple(sorted((source, new_dataset_id)))
                         id_pair = tuple(sorted((id, new_id)))
+                        if dataset_pair not in valid_two_nodes:
+                            valid = False
+                            break
                         if id_pair not in valid_two_nodes[dataset_pair]:
                             valid = False
                             break
@@ -621,10 +690,12 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         # oidname2freebase[''] = ''
         names = []
         for d in datasets:
-            names.extend(eval(d+'_lb'))
+            meta = MetadataCatalog.get(d)
+            stuff_class = meta.stuff_classes
+            names.extend(stuff_class)
         merged = [False for _ in range(len(names))]
         print_order = datasets
-        heads = ['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
+        heads = datasets
         head_str = 'key'
         for head in heads:
             head_str = head_str + ', {}'.format(head)
@@ -635,10 +706,10 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 inds = top_clusters[i][1:]
                 dataset_name = {d: '' for d in datasets}
                 for ind in inds:
-                merged[ind] = True
-                d = datasets[id2source[ind]]
-                name = names[ind]
-                dataset_name[d] = name
+                    merged[ind] = True
+                    d = datasets[id2source[ind]]
+                    name = names[ind]
+                    dataset_name[d] = name
                 # if name == 'background':
                 #   continue
                 unified_name = dataset_name[print_order[0]].replace(',', '_')
@@ -653,33 +724,37 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                     # print(', {}'.format(dataset_name[d]), end='')
                     # print("!:", dataset_name[d])
                     if dataset_name[d] != '':
-                        print(', {}'.format(eval(d+'_lb').index(dataset_name[d])), end='')
+                        meta = MetadataCatalog.get(d)
+                        stuff_class = meta.stuff_classes
+                        print(', {}'.format(stuff_class.index(dataset_name[d])), end='')
                     else:
                         print(', {}'.format(dataset_name[d]), end='')
                 print()
         for ind in range(len(names)):
-        if not merged[ind]:
-            dataset_name = {d: '' for d in datasets}
-            d = datasets[id2source[ind]]
-            name = names[ind]
-            # if name == 'background':
-            #   continue
-            dataset_name[d] = name
-            unified_name = dataset_name[print_order[0]].replace(',', '_')
-            for d in print_order[1:]:
-                unified_name = unified_name + '_{}'.format(dataset_name[d].replace(',', '_'))
-            print(unified_name, end='')
-            cnt = cnt + 1
-            for d in print_order:
-                # if d == 'oid':
-                #     print(', {}, {}'.format(oidname2freebase[dataset_name[d]], dataset_name[d]), end='')
-                # else:
-                # print(', {}'.format(dataset_name[d]), end='')
-                if dataset_name[d] != '':
-                    print(', {}'.format(eval(d+'_lb').index(dataset_name[d])), end='')
-                else:
-                    print(', {}'.format(dataset_name[d]), end='')
-            print()
+            if not merged[ind]:
+                dataset_name = {d: '' for d in datasets}
+                d = datasets[id2source[ind]]
+                name = names[ind]
+                # if name == 'background':
+                #   continue
+                dataset_name[d] = name
+                unified_name = dataset_name[print_order[0]].replace(',', '_')
+                for d in print_order[1:]:
+                    unified_name = unified_name + '_{}'.format(dataset_name[d].replace(',', '_'))
+                print(unified_name, end='')
+                cnt = cnt + 1
+                for d in print_order:
+                    # if d == 'oid':
+                    #     print(', {}, {}'.format(oidname2freebase[dataset_name[d]], dataset_name[d]), end='')
+                    # else:
+                    # print(', {}'.format(dataset_name[d]), end='')
+                    if dataset_name[d] != '':
+                        meta = MetadataCatalog.get(d)
+                        stuff_class = meta.stuff_classes
+                        print(', {}'.format(stuff_class.index(dataset_name[d])), end='')
+                    else:
+                        print(', {}'.format(dataset_name[d]), end='')
+                print()
         print()
         print('num_cats', cnt)
 

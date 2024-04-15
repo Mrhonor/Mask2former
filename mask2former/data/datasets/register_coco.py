@@ -223,7 +223,7 @@ def register_coco_train():
     lb_map = {}
     for el in labels_info:
         lb_map[el['id']] = el['trainId']
-    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2")]:
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2"), ("val_temp", "val_temp")]:
         name = f"coco_sem_seg_{n}"
         annpath = f'mask2former/datasets/coco/{anp}.txt'
         DatasetCatalog.register(
@@ -386,7 +386,7 @@ def register_coco_mseg():
         train_to_mseg_map[train['trainId']] = mseg['trainId']
     
     
-    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2"), ("val", "val")]:
+    for n, anp in [("train", "train"), ("train_1", "train_1"), ("train_2", "train_2"), ("val", "val"), ("val_temp", "val_temp")]:
         name = f"coco_mseg_sem_seg_{n}"
         annpath = f'mask2former/datasets/coco/{anp}.txt'
         DatasetCatalog.register(

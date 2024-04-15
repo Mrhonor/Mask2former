@@ -33,6 +33,8 @@ CITY_ID = 0
 CAM_ID = 1
 A2D2_ID = 2
 
+def is_distributed():
+    return torch.distributed.is_initialized()
 
 
 def get_round_size(size, divisor=32):
@@ -460,7 +462,11 @@ def inference_context(model):
 class iter_info_hook(HookBase):
     @torch.no_grad()
     def before_step(self):
-        self.trainer.model.iters = self.trainer.iter
+        if is_distributed():
+            model = self.trainer.model.module
+        else:
+            model = self.trainer.model
+        model.iters = self.trainer.iter
 
 
 def print_bipartite(datasets_cats, n_datasets, bi_graphs, total_cats, datasets_name):
@@ -502,9 +508,13 @@ def print_bipartite(datasets_cats, n_datasets, bi_graphs, total_cats, datasets_n
 
 class find_unuse_hook(HookBase):
     def after_step(self):
-        if self.trainer.iter > self.trainer.cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS and int(self.trainer.model.finetune_stage) == 1:
-            logger = logging.getLogger(__name__)
+        if is_distributed():
+            model = self.trainer.model.module
+        else:
             model = self.trainer.model
+        if self.trainer.iter > self.trainer.cfg.MODEL.GNN.FINETUNE_STAGE1_ITERS and int(model.finetune_stage) == 1:
+            logger = logging.getLogger(__name__)
+
             model.finetune_stage = torch.zeros(1)
             bipart_graph = model.get_bipart_graph()
             callbacks = None
@@ -562,7 +572,7 @@ class find_unuse_hook(HookBase):
                             start_eval_time = time.perf_counter()
                             labels = [x["sem_seg"][None].cuda() for x in inputs]
 
-                            logits = [output["uni_logits"][None] for output in outputs]
+                            logits = [output["uni_logits"] for output in outputs]
                             
                             for lb, lg in zip(labels, logits):
 
@@ -647,7 +657,7 @@ class find_unuse_hook(HookBase):
                     if total_num != 0:
                         for i in val:
                             rate = hist[index][i] / total_num
-                            if rate > 0.1:
+                            if rate > 0.001:
                                 # new_val.append([i, rate])
                                 new_val.append(i)
                     else:
@@ -679,12 +689,16 @@ class find_unuse_hook(HookBase):
 class eval_link_hook(HookBase):
     @torch.no_grad()
     def after_step(self):
-        if (self.trainer.iter+1) % 5000 == 0 and self.trainer.model.train_seg_or_gnn==self.trainer.model.GNN and not self.trainer.model.init_gnn_stage:
+        if is_distributed():
+            model = self.trainer.model.module
+        else:
+            model = self.trainer.model
+        if self.trainer.iter % 5000 == 0 and model.train_seg_or_gnn==model.GNN and not model.init_gnn_stage:
             logger = logging.getLogger(__name__)
             logger.info(f"eval link at iteration {self.trainer.iter}!")
             # org_aux = net.aux_mode
 
-            model = self.trainer.model
+            # model = self.trainer.model
             bipart_graph = model.get_bipart_graph()
             ignore_label = 255
             datasets_cats = self.trainer.cfg.DATASETS.DATASETS_CATS
@@ -841,3 +855,201 @@ class eval_link_hook(HookBase):
             # target_bipart.cat(target_bipart, dim=0)
             model.set_target_bipart(target_bipart)
             
+
+def print_unify_label_space(build_test_loader, model, cfg):
+
+    logger = logging.getLogger(__name__)
+    
+    bipart_graph = model.get_bipart_graph()
+    callbacks = None
+    ignore_label = 255
+    datasets_cats = cfg.DATASETS.DATASETS_CATS
+    n_datasets = len(datasets_cats)
+    ignore_index = cfg.DATASETS.IGNORE_LB
+    total_cats = 0
+    for i in range(0, n_datasets):
+        total_cats += datasets_cats[i]
+    num_unfiy_class = cfg.DATASETS.NUM_UNIFY_CLASS
+    datasets_name = cfg.DATASETS.TRAIN
+    # dls = get_data_loader(configer, aux_mode='train', distributed=is_dist, stage=2)
+    print_bipartite(datasets_cats, n_datasets, bipart_graph, total_cats, datasets_name)
+
+    loaded_map = {}
+    for dataset_idx, dataset_name in enumerate(cfg.DATASETS.EVAL):
+        logger.info("evaluating dataset {}:".format(i+1))    
+
+        data_loader = build_test_loader(cfg, dataset_name)
+
+        n_classes = datasets_cats[dataset_idx]
+        hist = torch.zeros(n_classes, num_unfiy_class).cuda()    
+        
+        with torch.no_grad():
+            total = len(data_loader)
+            num_warmup = min(5, total - 1)
+            start_time = time.perf_counter()
+            total_data_time = 0
+            total_compute_time = 0
+            total_eval_time = 0
+            with ExitStack() as stack:
+                if isinstance(model, nn.Module):
+                    stack.enter_context(inference_context(model))
+                stack.enter_context(torch.no_grad())
+
+                start_data_time = time.perf_counter()
+                dict.get(callbacks or {}, "on_start", lambda: None)()
+                for idx, inputs in enumerate(data_loader):
+                    total_data_time += time.perf_counter() - start_data_time
+                    if idx == num_warmup:
+                        start_time = time.perf_counter()
+                        total_data_time = 0
+                        total_compute_time = 0
+                        total_eval_time = 0
+
+                    start_compute_time = time.perf_counter()
+                    dict.get(callbacks or {}, "before_inference", lambda: None)()
+                    outputs = model(inputs)
+                    dict.get(callbacks or {}, "after_inference", lambda: None)()
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
+                    total_compute_time += time.perf_counter() - start_compute_time
+
+                    start_eval_time = time.perf_counter()
+                    labels = [x["sem_seg"][None].cuda() for x in inputs]
+
+                    logits = [output["uni_logits"] for output in outputs]
+                    
+                    for lb, lg in zip(labels, logits):
+                        # logger.info(lb.shape)
+                        # logger.info(lg.shape)
+                        lb = F.interpolate(lb.unsqueeze(1).float(), size=(lg.shape[2], lg.shape[3]),
+                                mode='nearest').squeeze(1).long()
+
+                        probs = torch.softmax(lg, dim=1)
+                        preds = torch.argmax(probs, dim=1)
+                                            
+                        keep = lb != ignore_label
+
+                        hist += torch.tensor(np.bincount(
+                            lb.cpu().numpy()[keep.cpu().numpy()] * num_unfiy_class + preds.cpu().numpy()[keep.cpu().numpy()],
+                            minlength=n_classes * num_unfiy_class
+                        )).cuda().view(n_classes, num_unfiy_class) 
+                    total_eval_time += time.perf_counter() - start_eval_time
+
+                    iters_after_start = idx + 1 - num_warmup * int(idx >= num_warmup)
+                    data_seconds_per_iter = total_data_time / iters_after_start
+                    compute_seconds_per_iter = total_compute_time / iters_after_start
+                    eval_seconds_per_iter = total_eval_time / iters_after_start
+                    total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
+                    if idx >= num_warmup * 2 or compute_seconds_per_iter > 5:
+                        eta = datetime.timedelta(seconds=int(total_seconds_per_iter * (total - idx - 1)))
+                        log_every_n_seconds(
+                            logging.INFO,
+                            (
+                                f"Inference done {idx + 1}/{total}. "
+                                f"Dataloading: {data_seconds_per_iter:.4f} s/iter. "
+                                f"Inference: {compute_seconds_per_iter:.4f} s/iter. "
+                                f"Eval: {eval_seconds_per_iter:.4f} s/iter. "
+                                f"Total: {total_seconds_per_iter:.4f} s/iter. "
+                                f"ETA={eta}"
+                            ),
+                            n=5,
+                        )
+                    start_data_time = time.perf_counter()
+                dict.get(callbacks or {}, "on_end", lambda: None)()
+
+            # Measure the time only for this worker (before the synchronization barrier)
+            total_time = time.perf_counter() - start_time
+            total_time_str = str(datetime.timedelta(seconds=total_time))
+            # NOTE this format is parsed by grep
+            logger.info(
+                "Total inference time: {} ({:.6f} s / iter per device)".format(
+                    total_time_str, total_time / (total - num_warmup)
+                )
+            )
+            total_compute_time_str = str(datetime.timedelta(seconds=int(total_compute_time)))
+            logger.info(
+                "Total inference pure compute time: {} ({:.6f} s / iter per device)".format(
+                    total_compute_time_str, total_compute_time / (total - num_warmup)
+                )
+            )
+
+        max_value, max_index = torch.max(bipart_graph[dataset_idx], dim=0)
+        # print(max_value)
+        
+        # torch.set_printoptions(profile="full")
+        # print(hist)
+
+        buckets = {}
+        for index, j in enumerate(max_index):
+            if max_value[index] == 0:
+                continue
+            
+            if int(j) not in buckets:
+                buckets[int(j)] = [index]
+            else:
+                buckets[int(j)].append(index)
+
+        for index in range(0, n_classes):
+            if index not in buckets:
+                logger.info(f'index not in buckets: {index}')
+                buckets[index] = []
+
+        for index, val in buckets.items():
+            total_num = 0
+            for i in val:
+                total_num += hist[index][i]
+            new_val = []
+            if total_num != 0:
+                for i in val:
+                    rate = hist[index][i] / total_num
+                    if rate > 0.001:
+                        new_val.append([i, rate])
+                        # new_val.append(i)
+            else:
+                for i in val:
+                    new_val.append([i, 0])
+                    # new_val.append(i)
+            
+            buckets[index] = new_val
+            
+            
+            for index in range(0, n_classes):
+                if index not in buckets:
+                    buckets[index] = []
+                print("\"{}\": {}".format(index, buckets[index]))    
+            
+            loaded_map[f'dataset{dataset_idx}'] = buckets
+    #     break
+    # n_datasets = 1
+    bi_graphs = []
+    for dataset_id in range(0, n_datasets):
+        n_cats = datasets_cats[dataset_id]
+        this_bi_graph = torch.zeros(n_cats, num_unfiy_class)
+        for key, val in loaded_map['dataset'+str(dataset_id)].items():
+            for idx, v in val:
+                this_bi_graph[int(key)][int(idx)] = v
+            
+        bi_graphs.append(this_bi_graph.cuda())
+
+            
+    
+    datasets = ['city', 'mapi', 'sun', 'bdd', 'idd', 'ade', 'coco']
+    city_lb = ["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
+    mapi_lb = ["Bird", "Ground Animal", "Curb", "Fence", "Guard Rail", "Barrier", "Wall", "Bike Lane", "Crosswalk - Plain", "Curb Cut", "Parking", "Pedestrian Area", "Rail Track", "Road", "Service Lane", "Sidewalk", "Bridge", "Building", "Tunnel", "Person", "Bicyclist", "Motorcyclist", "Other Rider", "Lane Marking - Crosswalk", "Lane Marking - General", "Mountain", "Sand", "Sky", "Snow", "Terrain", "Vegetation", "Water", "Banner", "Bench", "Bike Rack", "Billboard", "Catch Basin", "CCTV Camera", "Fire Hydrant", "Junction Box", "Manhole", "Phone Booth", "Pothole", "Street Light", "Pole", "Traffic Sign Frame", "Utility Pole", "Traffic Light", "Traffic Sign (Back)", "Traffic Sign (Front)", "Trash Can", "Bicycle", "Boat", "Bus", "Car", "Caravan", "Motorcycle", "On Rails", "Other Vehicle", "Trailer", "Truck", "Wheeled Slow", "Car Mount", "Ego Vehicle"]
+    sun_lb = [ "bag", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower curtain", "box", "whiteboard", "person", "night stand", "toilet", "sink", "lamp", "bathtub"]
+    bdd_lb = ["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
+    idd_lb = ["road", "drivable fallback or parking", "sidewalk", "non-drivable fallback or rail track", "person or animal", "out of roi or rider", "motorcycle", "bicycle", "autorickshaw", "car", "truck", "bus", "trailer or caravan or vehicle fallback", "curb", "wall", "fence", "guard rail", "billboard", "traffic sign", "traffic light", "polegroup or pole", "obs-str-bar-fallback", "building", "tunnel or bridge", "vegetation", "sky or fallback background"]
+    ade_lb = ['flag', 'wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed ', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 'radiator', 'glass', 'clock']
+    coco_lb = ["rug-merged", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"]
+
+    for idx in range(num_unfiy_class):
+        maps_name = f"{idx} : "
+        for set_id in range(n_datasets):
+            map_id = torch.argmax(bi_graphs[set_id][:,idx])
+            if bi_graphs[set_id][map_id][idx] == 0:
+                continue
+            this_name = eval(datasets[set_id]+'_lb')[map_id]
+            maps_name += f"{datasets[set_id]}: {this_name} ({bi_graphs[set_id][map_id][idx]}); "
+        logger.info(maps_name)
+
+    # model.set_bipartite_graphs(bi_graphs) 

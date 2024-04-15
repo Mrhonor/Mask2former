@@ -22,6 +22,8 @@ from setuptools import find_packages
 from setuptools import setup
 
 requirements = ["torch", "torchvision"]
+# os.environ["CUDA_HOME"] = "/usr/local/cuda-11.7"
+# cuda_home = os.environ.get("CUDA_HOME")
 
 def get_extensions():
     this_dir = os.path.dirname(os.path.abspath(__file__))
