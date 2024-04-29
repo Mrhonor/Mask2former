@@ -10,7 +10,7 @@ from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
 from detectron2.modeling.postprocessing import sem_seg_postprocess
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
-from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
+from .modeling.transformer_decoder.GNN.ltbgnn_llama import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
 from .modeling.loss.ohem_ce_loss import OhemCELoss
 from timm.models.layers import trunc_normal_
@@ -195,13 +195,14 @@ class HRNet_W48_Finetune_Vis_ARCH(nn.Module):
             processed_results = []
             bipart = self.get_bipart_graph()
             for input_per_image, image_size, uni_logits in zip(batched_inputs, images.image_sizes, outputs['uni_logits']):
-                logits = [torch.einsum('bnhw, cn -> bchw', uni_logits, bipart[i]) for i in range(len(bipart))]
+                # logits = [torch.einsum('bnhw, cn -> bchw', uni_logits, bipart[i]) for i in range(len(bipart))]
+                logits = None #[torch.einsum('bnhw, cn -> bchw', uni_logits, bipart[i]) for i in range(len(bipart))]
                 
                 
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
-                logits = [F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True) for logit in logits]
-                logits = [retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width) for logit in logits]
+                # logits = [F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True) for logit in logits]
+                # logits = [retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width) for logit in logits]
                 # uni_logits = logit
                 uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)

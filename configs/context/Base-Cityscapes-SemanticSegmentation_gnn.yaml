@@ -16,7 +16,7 @@ MODEL:
 DATASETS:
   TRAIN: ("context_sem_seg_train", )
   TEST: ("context_sem_seg_val", )
-  DATASETS_CATS: [60]
+  DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
   IGNORE_LB: 255
   NUM_UNIFY_CLASS: 231
   CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'

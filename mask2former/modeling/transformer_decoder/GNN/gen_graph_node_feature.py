@@ -21,6 +21,8 @@ import pickle
 from tqdm import tqdm
 import torch.distributed as dist
 from ....utils.configer import Configer
+from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
+
 
 class ToTensor(object):
     '''
@@ -426,6 +428,61 @@ def gen_image_features_storage(configer, dataset_id):
 
 
 def get_encode_lb_vec(configer, datasets_id=None):
+    ori_model_path = '/home1/marong/llama/llama-2-7b-hf'
+    # param_json = 'llama-2-7b/params.json'
+    config_kwargs = {
+        "trust_remote_code": True,
+        # "cache_dir": './llama-2-7b-hf',
+        "revision": 'main',
+        # "use_auth_token": None,
+        "output_hidden_states": True
+    }
+    tokenizer = AutoTokenizer.from_pretrained(ori_model_path)
+    config = AutoConfig.from_pretrained(ori_model_path, **config_kwargs)
+
+    llama_model = AutoModelForCausalLM.from_pretrained(
+        ori_model_path,
+        config=config,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+        trust_remote_code=True,
+        revision='main',
+    ).cuda()
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        llama_model.resize_token_embeddings(len(tokenizer))
+    n_datasets = configer.get('n_datasets')
+    text_feature_vecs_all = []
+    with torch.no_grad():
+        # clip_model, _ = clip.load("ViT-B/32", device="cuda")
+        for i in range(0, n_datasets):
+            text_feature_vecs = []
+            if datasets_id != None and i != datasets_id:
+                continue
+            lb_name = configer.get("dataset"+str(i+1), "label_names")
+            for lb in lb_name:
+                tokens = tokenizer.encode_plus(lb, add_special_tokens=True, padding='max_length', truncation=True,
+                                        max_length=128, return_tensors='pt')
+                input_ids = tokens["input_ids"]
+                attention_mask = tokens['attention_mask']
+                outputs = llama_model(input_ids=input_ids.cuda(), attention_mask=attention_mask)
+                # embedding = list(outputs.hidden_states)
+                
+                hidden_states = outputs.hidden_states
+                last_hidden_states = hidden_states[-1].squeeze()
+                # fisrt_larst_avg_status = last_hidden_states.mean(dim=0)
+                first_hidden_states = hidden_states[0].squeeze()
+                # print(hidden_states.shape)
+                # 计算平均状态
+                fisrt_larst_avg_status = (first_hidden_states + last_hidden_states).mean(dim=0)
+                text_feature_vecs.append(fisrt_larst_avg_status[None])
+            text_feature_vecs = torch.cat(text_feature_vecs, dim=0)
+            text_feature_vecs_all.append(text_feature_vecs)
+            # text_feature_vecs.append(text_features)
+            
+    return text_feature_vecs_all
+                
+def get_encode_lb_vec_clip(configer, datasets_id=None):
     n_datasets = configer.get('n_datasets')
     text_feature_vecs = []
     with torch.no_grad():
@@ -440,8 +497,45 @@ def get_encode_lb_vec(configer, datasets_id=None):
             text_feature_vecs.append(text_features)
             
     return text_feature_vecs
-                
+
 def gen_graph_node_feature(cfg):
+    configer = Configer(configs=cfg.DATASETS.CONFIGER)
+    n_datasets = configer.get("n_datasets")
+    save_pth = 'output/'
+    if not osp.exists(save_pth): os.makedirs(save_pth)
+    
+    file_name = save_pth + 'graph_node_features_llama'
+    dataset_names = []
+    for i in range(0, configer.get('n_datasets')):
+        # file_name += '_'+str(configer.get('dataset'+str(i+1), 'data_reader'))
+        dataset_names.append(str(configer.get('dataset'+str(i+1), 'data_reader')))
+    
+    # file_name += '.pt'
+    out_features = []
+    for i in range(0, n_datasets):
+        this_file_name = file_name + f'_{dataset_names[i]}.pt' 
+        if osp.exists(this_file_name):
+            this_graph_node_features = torch.load(this_file_name, map_location='cpu')
+
+            out_features.append(this_graph_node_features)
+        else:
+            print(f'gen_graph_node_featuer: {i}')
+            # img_feature_vecs = gen_image_features(configer, i)
+            # img_feat_tensor = torch.cat(img_feature_vecs, dim=0)
+            
+            text_feature_vecs = get_encode_lb_vec(configer, i)[0]
+            this_graph_node_features = torch.cat([text_feature_vecs, img_feat_tensor], dim=1)
+            
+            print("gen finished")
+            torch.save(this_graph_node_features.clone(), this_file_name)
+
+            out_features.append(this_graph_node_features.cpu())
+    
+    out_features = torch.cat(out_features, dim=0)
+    print(out_features.shape)
+    return out_features 
+    
+def gen_graph_node_feature_clip(cfg):
     configer = Configer(configs=cfg.DATASETS.CONFIGER)
     n_datasets = configer.get("n_datasets")
     save_pth = 'output/'
@@ -467,7 +561,7 @@ def gen_graph_node_feature(cfg):
             img_feature_vecs = gen_image_features(configer, i)
             img_feat_tensor = torch.cat(img_feature_vecs, dim=0)
             
-            text_feature_vecs = get_encode_lb_vec(configer, i)[0]
+            text_feature_vecs = get_encode_lb_vec_clip(configer, i)[0]
             this_graph_node_features = torch.cat([text_feature_vecs, img_feat_tensor], dim=1)
             
             print("gen finished")
@@ -478,7 +572,6 @@ def gen_graph_node_feature(cfg):
     out_features = torch.cat(out_features, dim=0)
     print(out_features.shape)
     return out_features 
-    
     
     # if not osp.exists(save_pth): os.makedirs(save_pth)
     

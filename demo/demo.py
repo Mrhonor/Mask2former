@@ -115,35 +115,53 @@ if __name__ == "__main__":
             assert args.input, "The input path(s) was not found"
         for path in tqdm.tqdm(args.input, disable=not args.output):
             # use PIL, to be consistent with evaluation
-            img = read_image(path, format="BGR")
-            start_time = time.time()
-            predictions, visualized_output, visual_uni_output = demo.run_on_image(img)
-            logger.info(
-                "{}: {} in {:.2f}s".format(
-                    path,
-                    "detected {} instances".format(len(predictions["instances"]))
-                    if "instances" in predictions
-                    else "finished",
-                    time.time() - start_time,
-                )
-            )
+            ds = ['cv']
+            cur_name = 'wd'
+            for d in ds:
+                list1 = os.listdir(os.path.join(path, d))
+                for l in list1:
+                    if 'png' not in l and 'jpg' not in l:
+                        continue
+                    out_dir = os.path.join(path, d)
+                    img = read_image(os.path.join(out_dir, l), format="BGR")
+                    start_time = time.time()
+                    # predictions, visualized_output, visual_uni_output = demo.run_on_image(img)
+                    predictions, visualized_output, visual_uni_output = demo.run_on_image(img)
+                    logger.info(
+                        "{}: {} in {:.2f}s".format(
+                            path,
+                            "detected {} instances".format(len(predictions["instances"]))
+                            if "instances" in predictions
+                            else "finished",
+                            time.time() - start_time,
+                        )
+                    )
+                    
+                    out_dir = os.path.join(out_dir, 'out')
+                    out_dir = os.path.join(out_dir, l)
+                    # visual_uni_output.save(out_dir.replace('.png', '_uni.png').replace('.jpg', '_uni.png'))
+                    out_dir = out_dir.replace('.jpg', f'_{cur_name}.jpg').replace('.png', f'_{cur_name}.jpg')
+                    visual_uni_output.save(out_dir)
+                    im = cv2.imread(out_dir)
+                    im = cv2.resize(im, (1120, 840))
+                    cv2.imwrite(out_dir, im)
 
-            if args.output:
-                if os.path.isdir(args.output):
-                    assert os.path.isdir(args.output), args.output
-                    out_filename = os.path.join(args.output, os.path.basename(path))
-                else:
-                    assert len(args.input) == 1, "Please specify a directory with args.output"
-                    out_filename = args.output
-                ds_name = ['cs', 'mp', 'sun', 'bdd', 'idd', 'ade', 'co']
-                for i in range(len(visualized_output)):
-                    visualized_output[i].save(out_filename.replace('.png', f'_{ds_name[i]}.png').replace('.jpg', f'_{ds_name[i]}.jpg'))
-                visual_uni_output.save(out_filename.replace('.png', '_uni.png').replace('.jpg', '_uni.jpg'))
-            else:
-                cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-                cv2.imshow(WINDOW_NAME, visualized_output.get_image()[:, :, ::-1])
-                if cv2.waitKey(0) == 27:
-                    break  # esc to quit
+            # if args.output:
+            #     if os.path.isdir(args.output):
+            #         assert os.path.isdir(args.output), args.output
+            #         out_filename = os.path.join(args.output, os.path.basename(path))
+            #     else:
+            #         assert len(args.input) == 1, "Please specify a directory with args.output"
+            #         out_filename = args.output
+            #     ds_name = ['cs', 'mp', 'sun', 'bdd', 'idd', 'ade', 'co']
+            #     # for i in range(len(visualized_output)):
+            #     #     visualized_output[i].save(out_filename.replace('.png', f'_{ds_name[i]}.png').replace('.jpg', f'_{ds_name[i]}.jpg'))
+            #     visual_uni_output.save(out_filename.replace('.png', '_uni.png').replace('.jpg', '_uni.jpg'))
+            # else:
+            #     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+            #     cv2.imshow(WINDOW_NAME, visualized_output.get_image()[:, :, ::-1])
+            #     if cv2.waitKey(0) == 27:
+            #         break  # esc to quit
     elif args.webcam:
         assert args.input is None, "Cannot have both --input and --webcam!"
         assert args.output is None, "output not yet supported with --webcam!"

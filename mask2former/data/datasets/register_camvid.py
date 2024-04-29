@@ -83,6 +83,7 @@ def register_camvid():
         stuff_classes=["Sky", "Building", "Column_Pole", "Road", "Sidewalk", "Tree", "SignSymbol", "Fence", "Car", "Pedestrian", "Bicyclist"],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors=[[225, 115,  77], [154, 172, 132], [ 70,  94, 120],[ 97, 187, 159],[236,   2, 131], [128, 109,  69],[218, 118, 115],[145, 208,  42],[ 14, 159,  57],[198, 221, 182], [ 24, 192, 253]],
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
@@ -133,6 +134,7 @@ def register_camvid_train():
             stuff_classes=["Sky", "Building", "Column_Pole", "Road", "Sidewalk", "Tree", "SignSymbol", "Fence", "Car", "Pedestrian", "Bicyclist"],
             stuff_dataset_id_to_contiguous_id=lb_map,
             thing_dataset_id_to_contiguous_id=lb_map,
+            stuff_colors=[[225, 115,  77], [154, 172, 132], [ 70,  94, 120],[ 97, 187, 159],[236,   2, 131], [128, 109,  69],[218, 118, 115],[145, 208,  42],[ 14, 159,  57],[198, 221, 182], [ 24, 192, 253]],
             evaluator_type="sem_seg",
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )

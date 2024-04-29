@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/best_model_final.pth"
+  WEIGHTS: "output/5ds_ltbgnn_llama_model_finetune.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -16,10 +16,10 @@ MODEL:
 DATASETS:
   TRAIN: ("kitti_sem_seg_train", )
   TEST: ("kitti_sem_seg_train", )
-  DATASETS_CATS: [19]
+  DATASETS_CATS: [19, 64, 19, 26, 26]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 231
-  CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'
+  NUM_UNIFY_CLASS: 70
+  CONFIGER: 'configs/ltbgnn_5_datasets_gpt.json'
 LOSS:
   OHEM_THRESH: 0.7 
   WITH_SPA_LOSS: True

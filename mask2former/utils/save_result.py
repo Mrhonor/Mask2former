@@ -64,19 +64,22 @@ def save_result(trainer_build_test_loader, cfg, model):
     target_bipart = []
 
     for dataset_idx, dataset_name in enumerate(cfg.DATASETS.TEST):
+        # if dataset_idx != 4:
+        #     continue
         if not osp.exists(f"output/{dataset_name}"):
             os.makedirs(f"output/{dataset_name}")
         
         data_loader = trainer_build_test_loader(cfg, dataset_name)
 
-        n_classes = datasets_cats[dataset_idx]-1
+        n_classes = 25#datasets_cats[dataset_idx]-1
         lb_map = torch.zeros(256, dtype=torch.uint8)
         lookup_table = MetadataCatalog.get(dataset_name).thing_dataset_id_to_contiguous_id
         for k, v in lookup_table.items():
-            if v < n_classes:
-                lb_map[v] = k
-            if v == 14:
-                lb_map[14] = 25
+            if v < n_classes and k <= 38:
+                if lb_map[v] == 0 or lb_map[v] > k:
+                    lb_map[v] = k
+            # if v == 14:
+            #     lb_map[14] = 25
         lb_map = lb_map.cuda()
         # hist_origin = torch.zeros(n_classes, n_classes).cuda().detach()    
         

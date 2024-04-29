@@ -76,7 +76,7 @@ from detectron2.structures import ImageList
 import torch.nn.functional as F
 import logging
 
-from mask2former.utils.evaluate import eval_link_hook, iter_info_hook
+from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook
 
 
 logger = logging.getLogger(__name__)
@@ -259,14 +259,23 @@ class Trainer(DefaultTrainer):
             dataset_id = 1
         elif 'sunrgbd' in dataset_name:
             dataset_id = 2
+            # dataset_id = 0
+            # if 'train' in dataset_name:
+            #     aux_mode = 'unseen'
         elif 'bdd' in dataset_name:
             dataset_id = 3
         elif 'idd' in dataset_name:
             dataset_id = 4
         elif 'ade' in dataset_name:
             dataset_id = 5
+            # dataset_id = 0
+            # if 'train' in dataset_name:
+            #     aux_mode = 'unseen'
         elif 'coco' in dataset_name:
             dataset_id = 6
+            # dataset_id = 0
+            # if 'train' in dataset_name:
+            #     aux_mode = 'unseen'
         else:
             dataset_id = 0
             if 'train' in dataset_name:
@@ -412,7 +421,7 @@ def main(args):
         )
         # build_bipartite_graph_for_unseen_for_manually(Trainer.build_test_loader, cfg, model)
         # return
-        # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
+        build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
@@ -423,6 +432,7 @@ def main(args):
     trainer = Trainer(cfg)
     # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
     trainer.register_hooks([iter_info_hook()])
+    # trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

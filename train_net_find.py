@@ -407,7 +407,7 @@ def main(args):
     DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
         cfg.MODEL.WEIGHTS, resume=args.resume
     )
-    find_specific_class(Trainer.build_test_loader, cfg, model, 82, [76], 6)
+    find_specific_class(Trainer.build_test_loader, cfg, model, 0, [122], 3)
         # build_bipartite_graph_for_unseen_for_manually(Trainer.build_test_loader, cfg, model)
         # return
         # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)

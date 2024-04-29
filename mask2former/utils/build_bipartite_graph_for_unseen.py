@@ -188,7 +188,7 @@ def build_bipartite_graph_for_unseen(trainer_build_test_loader, cfg, model):
         # print(hist)
                 
 
-        bipart = datasets_cats[dataset_idx] * torch.ones(448)
+        bipart = datasets_cats[dataset_idx] * torch.ones(512)
         for s, t in zip(src, target):
             bipart[s] = t
             # buckets[index] = new_val

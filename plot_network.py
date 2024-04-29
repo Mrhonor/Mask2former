@@ -65,11 +65,14 @@ myvalue_list = []
 # myvalue_list.extend(['uni']*graph.shape[1])
 wd_colors = [None] * 26
 uni_color = []
+uni_name = []
 for i in range(bigraph.shape[1]):
+    names = []
     cur_colors = []
     wd_list = []
     for j in range(bigraph.shape[0]):
-        if bigraph[i][j] == 1:
+        if bigraph[j][i] == 1:
+            names.append(id_to_lb[j])
             cur_dataset_id = id_to_datasetid[j]
             if cur_dataset_id != 4:
                 cur_colors.append(stuff_colors[cur_dataset_id][id_to_ori_id[j]])
@@ -82,12 +85,15 @@ for i in range(bigraph.shape[1]):
             flag = False
             break
     if flag == True:
+        uni_name.append(names[0])
         uni_color.append(cur_colors[0])  
         for j in wd_list:
             wd_colors[j] = cur_colors[0]
     else:
+        uni_name.append(names)
         uni_color.append(cur_colors)  
         for j in wd_list:
+            cur_colors.extend(names)
             wd_colors[j] = cur_colors
             
             
@@ -95,6 +101,7 @@ for i in range(bigraph.shape[1]):
 
 
 print(f"uni: {uni_color}")
+print(f"uni: {uni_name}")
 print(f'wd: {wd_colors}')
 exit(0)
 # for ds in datasets:

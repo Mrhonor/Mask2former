@@ -10,7 +10,7 @@ from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
 from detectron2.modeling.postprocessing import sem_seg_postprocess
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
-from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
+from .modeling.transformer_decoder.GNN.ltbgnn_llama import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
 from .modeling.loss.ohem_ce_loss import OhemCELoss
 from timm.models.layers import trunc_normal_
@@ -180,7 +180,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             dataset_lbs = [x["dataset_id"] for x in batched_inputs]
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
         else:
-            # dataset_lbs = 4
+            # dataset_lbs = 6
             if "dataset_id" in batched_inputs[0]:
                 dataset_lbs = int(batched_inputs[0]["dataset_id"])
             else:
@@ -236,18 +236,31 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 # dataset_lbs = 0
                 if self.dataset_adapter[dataset_lbs] is not None:
                     # logger.info(uni_logits.shape)
-                    preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                    uni_logits = F.softmax(uni_logits, dim=0)
+                    max_logits, preds = torch.max(uni_logits, dim=0, keepdim=True)
+                    # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                    preds = preds.long()
+                    # preds[max_logits < 0.3] = 255
                     this_mseg_map = self.dataset_adapter[dataset_lbs]
                     # logger.info(this_mseg_map)      
 
                     preds = this_mseg_map[preds].long()
                         # 创建一个与原张量相同大小的全零张量
-                    output = torch.zeros(int(torch.max(this_mseg_map)+1), preds.shape[1], preds.shape[2]).cuda()
-                    
+                    output = torch.zeros(int(torch.max(this_mseg_map)), preds.shape[1], preds.shape[2]).cuda()
+                    # preds[max_logits < 0.3] = int(torch.max(this_mseg_map)) - 1
                     # 将最大值所在位置置为 1
                     output.scatter_(0, preds, 1)
                     logit = output
-
+                
+                # logit = F.softmax(logit, dim=0)
+                # max_logits, preds = torch.max(logit, dim=0, keepdim=True)
+                # # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                # preds = preds.long()
+                # output = torch.zeros(26, preds.shape[1], preds.shape[2]).cuda()
+                # preds[max_logits < 0.3] = 25
+                # # 将最大值所在位置置为 1
+                # output.scatter_(0, preds, 1)
+                # logit = output
                 # logger.info(f"logit shape:{logit.shape}")
                 processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
             return processed_results             

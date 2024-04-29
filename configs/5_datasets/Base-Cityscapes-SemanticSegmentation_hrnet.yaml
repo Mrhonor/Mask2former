@@ -10,25 +10,26 @@ MODEL:
     KEEP_IMAGENET_HEAD: False  # not used
     DROP_STAGE4: False
     FULL_RES_STEM: False
-    BN_TYPE: "torchbn"  # use syncbn for cityscapes dataset
+    BN_TYPE: "torchsyncbn"  # use syncbn for cityscapes dataset
   AUX_MODE: "train"
   PRETRAINING: True
 DATASETS:
-  TRAIN: ("mapi_sem_seg_train_2", )
-  TEST: ("mapi_sem_seg_val", )
-  DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
+  TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "wilddash2_new_sem_seg_val")
+  EVAL: ("cs_sem_seg_train_2", "mapi_sem_seg_train_2", "bdd_sem_seg_train_2", "idd_sem_seg_train_2", "wilddash2_new_sem_seg_val")
+  TEST: ("cs_sem_seg_val", "mapi_sem_seg_train_2", "bdd_sem_seg_val", "idd_sem_seg_val", "wilddash2_new_sem_seg_val")
+  DATASETS_CATS: [19, 64, 19, 26, 26]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 231
-  CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'
+  NUM_UNIFY_CLASS: 154
+  CONFIGER: 'configs/ltbgnn_5_datasets.json'
 LOSS:
   OHEM_THRESH: 0.7 
   WITH_SPA_LOSS: True
   WITH_ORTH_LOSS: True
   WITH_ADJ_LOSS: True
 SOLVER:
-  IMS_PER_BATCH: 2
+  IMS_PER_BATCH: 12
   BASE_LR: 0.0001
-  MAX_ITER: 40000
+  MAX_ITER: 50000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 0
   WEIGHT_DECAY: 0.05
@@ -58,7 +59,7 @@ INPUT:
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:
-  EVAL_PERIOD: 10000
+  EVAL_PERIOD: 25000
   AUG:
     ENABLED: False
     MIN_SIZES: [256, 384, 512, 640, 768, 896, 512, 768, 1024, 1280, 1536, 1792]

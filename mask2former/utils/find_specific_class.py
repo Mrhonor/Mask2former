@@ -72,6 +72,7 @@ def find_specific_class(trainer_build_test_loader, cfg, model, target_id, target
     dataset_idx = 0
 
     data_loader = trainer_build_test_loader(cfg, dataset_name)
+    logger.info(f"find in {data_loader}")
     metadata_uni = MetadataCatalog.get(
             "uni"
         )
@@ -159,6 +160,7 @@ def find_specific_class(trainer_build_test_loader, cfg, model, target_id, target
                     if osp.exists(f"output/{dataset_name}/") == False:
                         os.makedirs(f"output/{dataset_name}/")
                     vis_output.save(f"output/{dataset_name}/{name}")
+                    logger.info(f"save output/{dataset_name}/{name}")
                     
                     
                 total_eval_time += time.perf_counter() - start_eval_time

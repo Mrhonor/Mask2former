@@ -256,7 +256,7 @@ class Trainer(DefaultTrainer):
         if 'cs' in dataset_name:
             dataset_id = 0            
         elif 'mapi' in dataset_name:
-            dataset_id = 1
+            dataset_id = 2
         elif 'sunrgbd' in dataset_name:
             dataset_id = 2
         elif 'bdd' in dataset_name:
@@ -267,12 +267,15 @@ class Trainer(DefaultTrainer):
             dataset_id = 5
         elif 'coco' in dataset_name:
             dataset_id = 6
+        elif 'wilddash' in dataset_name:
+            dataset_id = 4
         else:
             dataset_id = 0
             if 'train' in dataset_name:
                 aux_mode = 'unseen'
 
         return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id, datasets_name=[dataset_name])
+        # return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id)
 
     @classmethod
     def build_optimizer(cls, cfg, model):
@@ -406,7 +409,7 @@ def main(args):
         cfg.MODEL.WEIGHTS, resume=args.resume
     )
     
-    build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
+    # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
     save_result(Trainer.build_test_loader, cfg, model)
         # return
     # res = Trainer.test(cfg, model)

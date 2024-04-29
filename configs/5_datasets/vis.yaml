@@ -1,7 +1,7 @@
-_BASE_: ab_Base-Cityscapes-SemanticSegmentation_gnn.yaml
+_BASE_: Base-Cityscapes-SemanticSegmentation_gnn.yaml
 MODEL:
   META_ARCHITECTURE: "HRNet_W48_Finetune_Vis_ARCH"
-  WEIGHTS: "output/7ds_ltbgnn_llama_model_finetune.pth"
+  WEIGHTS: "output/5ds_ltbgnn_llama_model_finetune.pth"
   PRETRAINING: False
   SEM_SEG_HEAD:
     NAME: "HRNet_W48_llama"
@@ -30,6 +30,6 @@ MODEL:
     FINETUNE_STAGE1_ITERS: 20000
     INIT_ADJ_PATH: None
 DATASETS:
-  TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "sunrgbd_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "ade_sem_seg_train", "coco_sem_seg_train")
-  EVAL: ("cs_sem_seg_train_2", "mapi_sem_seg_train_2", "sunrgbd_sem_seg_train_2", "bdd_sem_seg_train_2", "idd_sem_seg_train_2", "ade_sem_seg_train_2", "coco_sem_seg_train_2")
-  TEST: ("cs_sem_seg_val", "mapi_sem_seg_val", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
+  TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "wilddash2_new_sem_seg_val")
+  EVAL: ("cs_sem_seg_train_2", "mapi_sem_seg_train_2", "bdd_sem_seg_train_2", "idd_sem_seg_train_2", "wilddash2_new_sem_seg_val")
+  TEST: ("cs_sem_seg_val", "mapi_sem_seg_train_2", "bdd_sem_seg_val", "idd_sem_seg_val", "wilddash2_new_sem_seg_val")

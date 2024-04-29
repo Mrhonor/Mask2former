@@ -937,8 +937,6 @@ class LoaderAdapter:
         mapper = []
         for i in range(len(dataset)):
             should_lkt = True
-            # if i==1 or i == 2 or i == 3 or i == 4 or i == 6:
-            #     should_lkt = True
 
             mapper.append(SemanticDatasetMapper(cfg, True, i, should_lkt))
 
@@ -950,16 +948,16 @@ class LoaderAdapter:
             self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)            
         else: # aux_mode == 'eval':
             
-            if dataset_id > 0:
-                mapper = SemanticDatasetMapper(cfg, False, dataset_id-1, True)
-                Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
-                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
-            else:
-            # if dataset_id >= len(self.datasets_name):
+            # if dataset_id > 0:
             #     mapper = SemanticDatasetMapper(cfg, False, dataset_id-1, True)
-            #     Log.info(f"evaluate {self.datasets_name[0]}")
-            #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[0], mapper=mapper)            
+            #     Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
+            #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
             # else:
+            if dataset_id >= len(self.datasets_name):
+                mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
+                Log.info(f"evaluate {self.datasets_name[0]}")
+                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[0], mapper=mapper)            
+            else:
                 mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
                 Log.info(f"evaluate {self.datasets_name[dataset_id]}")
                 self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)

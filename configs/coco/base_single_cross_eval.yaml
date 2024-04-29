@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/model_final_4GPU.pth"
+  WEIGHTS: "output/5ds_ltbgnn_llama_model_finetune.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -14,11 +14,11 @@ MODEL:
   AUX_MODE: "train"
   PRETRAINING: True
 DATASETS:
-  TRAIN: ("coco_sem_seg_train", )
+  TRAIN: ("coco_sem_seg_train_2", )
   TEST: ("coco_sem_seg_val", )
-  DATASETS_CATS: [19]
+  DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 19
+  NUM_UNIFY_CLASS: 448
   CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'
 LOSS:
   OHEM_THRESH: 0.7 

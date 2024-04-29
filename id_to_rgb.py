@@ -138,7 +138,7 @@ def main(args):
     # cfg = setup(args)
     
     # if args.eval_only:
-    dataset_name = 'mapi_sem_seg_train'
+    dataset_name = 'sunrgbd_sem_seg_train'
     meta = MetadataCatalog.get(dataset_name)
     lookup_table = MetadataCatalog.get(dataset_name).thing_dataset_id_to_contiguous_id
     stuff_colors = MetadataCatalog.get(dataset_name).stuff_colors
@@ -155,11 +155,13 @@ def main(args):
     color_image = stuff_colors[image] #image.point(lb_map)
     visualizer = Visualizer(color_image, meta, instance_mode=ColorMode.IMAGE)
     
-    lb_map[44] = 255
+    # lb_map[44] = 255
     image = lb_map[ori_image]
     out = visualizer.draw_sem_seg(image)
     out.save('rgb_image.png')
-    # cv2.imwrite('rgb_image.png', image[:,:,::-1])
+    im = cv2.imread('rgb_image.png')
+    im = cv2.resize(im, (1120, 840))
+    cv2.imwrite('rgb_image.jpg', im)
 
 
     # 保存转换后的图片

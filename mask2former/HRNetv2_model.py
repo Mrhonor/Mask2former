@@ -224,7 +224,7 @@ class HRNet_W48_ARCH(nn.Module):
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
         else:
             dataset_lbs = int(batched_inputs[0]["dataset_id"])
-            # dataset_lbs = 6
+            dataset_lbs = 6
         
         if self.Pretraining:
             features = self.backbone(images.tensor)

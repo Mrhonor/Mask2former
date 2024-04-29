@@ -53,6 +53,7 @@ def register_voc():
         stuff_classes=["aeroplane","bicycle","bird","boat","bottle","bus","car","cat","chair","cow","diningtable","dog","horse","motorbike","person","pottedplant","sheep","sofa","train","tvmonitor"],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors=[[87, 59, 76], [103, 81, 234], [251, 225,  86],[106, 48, 148],[217, 135, 68],[79, 127, 244],[14, 159, 57],[0,0,0], [38, 181, 228],[76, 21, 14], [7, 162, 5], [76, 21, 14],[76, 21, 14],[12, 50, 106],[198, 221, 182],[206, 106, 97],[76, 21, 14],[75, 211, 41],[254, 205,  75],[61, 206, 227]],
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
@@ -109,6 +110,7 @@ def register_voc_train():
             stuff_dataset_id_to_contiguous_id=lb_map,
             thing_dataset_id_to_contiguous_id=lb_map,
             evaluator_type="sem_seg",
+            stuff_colors=[[87, 59, 76], [103, 81, 234], [251, 225,  86],[106, 48, 148],[217, 135, 68],[79, 127, 244],[14, 159, 57],[0,0,0], [38, 181, 228],[76, 21, 14], [7, 162, 5], [76, 21, 14],[76, 21, 14],[12, 50, 106],[198, 221, 182],[206, 106, 97],[76, 21, 14],[75, 211, 41],[254, 205,  75],[61, 206, 227]],
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )
 
