@@ -14,9 +14,9 @@ MODEL:
   AUX_MODE: "train"
   PRETRAINING: False
 DATASETS:
-  TRAIN: ("wilddash2_sem_seg_val", )
-  TEST: ("wilddash2_sem_seg_val", )
-  DATASETS_CATS: [25]
+  TRAIN: ("wilddash2_new_sem_seg_val", )
+  TEST: ("wilddash2_new_sem_seg_test", )
+  DATASETS_CATS: [26]
   IGNORE_LB: 255
   NUM_UNIFY_CLASS: 231
   CONFIGER: 'configs/ltbgnn_7_datasets_snp.json'

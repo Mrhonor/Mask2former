@@ -64,8 +64,7 @@ from mask2former import (
     add_gnn_config,
     LoaderAdapter,
     build_bipartite_graph_for_unseen,
-    eval_for_mseg_datasets,
-    UniDetLearnUnifyLabelSpace
+    build_bipartite_graph_for_unseen_for_manually,
 )
 
 from PIL import Image
@@ -247,29 +246,43 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
+        print(f"build_test_loader:{dataset_name}")
+                
+        aux_mode = 'test'
+        if '_2' in dataset_name:
+            aux_mode = 'eval'
+            
         if 'cs' in dataset_name:
             dataset_id = 0            
         elif 'mapi' in dataset_name:
             dataset_id = 1
         elif 'sunrgbd' in dataset_name:
             dataset_id = 2
+            # dataset_id = 0
+            # if 'train' in dataset_name:
+            #     aux_mode = 'unseen'
         elif 'bdd' in dataset_name:
             dataset_id = 2
         elif 'idd' in dataset_name:
             dataset_id = 3
         elif 'ade' in dataset_name:
             dataset_id = 5
+            # dataset_id = 0
+            # if 'train' in dataset_name:
+            #     aux_mode = 'unseen'
         elif 'coco' in dataset_name:
             dataset_id = 6
         elif 'wilddash' in dataset_name:
             dataset_id = 4
         else:
             dataset_id = 0
-        
-        aux_mode = 'test'
-        if '_2' in dataset_name:
-            aux_mode = 'eval'
-            
+            if 'train' in dataset_name:
+                aux_mode = 'unseen'
+
+        dataset_id = 0
+        if 'train' in dataset_name:
+            aux_mode = 'unseen'
+
         return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id)
 
     @classmethod

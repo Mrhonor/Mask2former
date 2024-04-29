@@ -72,6 +72,39 @@ def register_uni():
     )
 
 
-
 # _root = os.getenv("DETECTRON2_DATASETS", "datasets")
 register_uni()
+
+
+def register_5ds_uni():
+    
+    
+    # meta = _get_ade20k_full_meta()
+    # for name, dirname in [("train", "train"), ("val", "val")]:
+    # dirname = 'train'
+    lb_map = {}
+    for i in range(70):
+        lb_map[i] = i
+        # if el['id'] == 0:
+        #     lb_map[el['id']] = 255
+        # else:
+        #     lb_map[el['id']] = el['id'] - 1
+
+    name = f"5ds_uni"
+    DatasetCatalog.register(
+        name, uni
+    )
+    # ['train', 'Pedestrian Area,', 'Lane Marking', 'Void', 'curb', 'Parking', 'knife', 'Barrier', 'Bike Lane', 'Bike Rack', 'Street Light', 'Trash Can', 'fork', 'trailer', 'crt screen', 'fruit', 'Ego Vehicle', '17', 'Animal', 'Crosswalk', 'tie', 'Snow', 'broccoli', '23', 'fire hydrant', 'gravel', 'Traffic Sign (Back)', 'Car Mount', '28', 'night stand', 'bookshelf', 'picture', 'desk', 'clothes', 'lamp', 'bathtub', 'handbag', 'window-blind', 'paper', ' wall-wood', 'tree or pole', 'grass', 'house', 'sea', 'rug or Wheeled Slow', 'playingfield', 'rock', 'suitcase', 'path', 'river', 'coffee table', 'flower', 'bench', 'oven', 'light', 'airplane', 'escalator', 'bottle', 'cell phone', 'plaything', 'basket or cup', 'tent', 'bag', 'ball', 'food', 'microwave', 'pot or Fire Hydrant', 'vase', 'plate', 'monitor or laptop', 'glass', 'clock', 'terrain', 'Box', 'Rail Track', 'Billboard', 'Bridge', 'Mountain', 'Sand', 'Water', 'Boat', 'floor', 'cabinet', 'bed', 'sofa', 'table', 'door', 'window', 'counter', 'shelf', 'curtain', 'pillow', 'mirror', 'ceiling', 'books', 'television', 'towel', 'toilet', 'rider', 'Bench', 'sink', 'refridgerator', 'guard rail', 'sidewalk', 'pole', 'vegetation', 'traffic sign', 'road', 'building', 'fence', 'traffic light', 'sky', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'wall', 'person', 'Service Lane', '120', 'Motorcyclist', 'Lane Marking - Genera', 'baseball bat', 'Traffic Sign Frame', '125', 'Void', 'Banner', 'earth', 'armchair', 'seat', 'wardrobe', 'cushion', '133', 'fork', 'dresser', 'skyscraper', 'Tunnel', 'Other Vehicle', 'runway', 'case', 'pool table', 'shower curtain', 'stairway', 'blinds', 'hill', 'countertop', 'palm', 'kitchen island', 'arcade machine', 'hovel', 'tower', 'chandelier', 'awning', 'booth', 'dirt track', 'land', 'fruit', 'buffet', 'poster', 'Trailer', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'swimming pool', 'stool', 'barrel', 'waterfall', 'cradle', 'oven', 'tank', 'trade name', 'animal', 'lake', 'dishwasher', 'screen', 'Void', 'sculpture', 'hood', 'sconce', 'fan', 'pier', 'bulletin board', '185', 'radiator', 'parking meter', 'bird', 'swivel chair', 'horse', 'sheep', 'cow', 'elephant', 'Void', 'zebra', 'giraffe', 'umbrella', 'Void', 'kite', '200', 'Void', 'skateboard', 'surfboard', 'tennis racket', '205', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'mouse', 'remote', 'keyboard', 'toaster', 'scissors', 'Void', 'toothbrush', 'blanket', 'floor-wood', 'platform', 'roof', 'wall-tile', 'pavement-merged', 'rock-merged'],
+    
+    # [str(i) for i in range(231)],
+    MetadataCatalog.get(name).set(
+        stuff_classes= ['Curb', 'Parking','Ground Animal', 'Lane Marking - General', 'Street Light', 'Caravan', 'Ego Vehicle', 'train', 'Guard Rail', 'Billboard', 'rider', 'road', 'sidewalk', 'building', 'wall', 'fence', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'Barrier', 'Bird', 'Bike Lane', 'Crosswalk - Plain', 'Curb Cut', 'Pedestrian Area', 'Rail Track', 'Service Lane', 'Bridge', 'Tunnel', 'Bicyclist', 'Motorcyclist', 'Other Rider', 'Lane Marking - Crosswalk', 'Mountain', 'Sand', 'Snow', 'Water', 'Banner','Bench', 'Bike Rack', 'Catch Basin', 'CCTV Camera', 'Fire Hydrant', 'Junction Box', 'Manhole', 'Phone Booth', 'Pothole', 'Traffic Sign Frame', 'Utility Pole', 'Traffic Sign (Back)', 'Trash Can', 'Boat', 'Other Vehicle', 'Trailer', 'Wheeled Slow', 'Car Mount', 'autorickshaw', 'trailer or caravan or vehicle fallback', 'obs-str-bar-fallback', 'Tunnel', 'obs-str-bar-fallback'],
+        stuff_dataset_id_to_contiguous_id=lb_map,
+        thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors=[[66, 69, 176], [109, 220, 239], [50, 105, 96], [226, 27, 43], [26, 184, 83], [109, 64, 73], [214, 92, 19], [254, 205, 75], [180, 241, 180], [215, 48, 75], [24, 192, 253], [97, 187, 159], [236, 2, 131], [154, 172, 132], [174, 203, 111], [145, 208, 42], [70, 94, 120], [153, 29, 134], [218, 118, 115], [128, 109, 69], [155, 117, 111],[225, 115, 77], [198, 221, 182], [14, 159, 57], [81, 255, 160], [79, 127, 244], [12, 50, 106], [103, 81, 234], [251, 225, 86], [212, 221, 176],[230, 246, 34], [0, 81, 175], [113, 216, 102], [178, 109, 61], [9, 60, 225], [195, 172, 234], [76, 66, 237], [18, 58, 98], [199, 215, 29], [64, 129, 196], [24, 192, 253], [232, 182, 126], [252, 168, 166], [135, 161, 131], [148, 126, 90], [79, 24, 196], [30, 123, 47],[38, 181, 228], [141, 17, 60], [236, 223, 130], [208, 211, 35], [73, 208, 97], [58, 34, 9], [34, 168, 123], [177, 158, 120], [100, 32, 22], [186, 140, 216], [126, 101, 165], [169, 102, 174], [30, 47, 184], [106, 48, 148], [125, 123, 180],[80, 108, 57], [230, 175, 199], [131, 218, 87], [77, 252, 183], [224, 216, 151], [160, 111, 0], [18, 58, 98], [160, 111, 0]],
+        evaluator_type="sem_seg",
+        ignore_label=65535,  # NOTE: gt is saved in 16-bit TIFF images
+    )
+
+# _root = os.getenv("DETECTRON2_DATASETS", "datasets")
+register_5ds_uni()

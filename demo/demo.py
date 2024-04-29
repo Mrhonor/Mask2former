@@ -141,7 +141,12 @@ if __name__ == "__main__":
                     out_dir = os.path.join(out_dir, 'out')
                     out_dir = os.path.join(out_dir, l)
                     # visual_uni_output.save(out_dir.replace('.png', '_uni.png').replace('.jpg', '_uni.png'))
-                    visual_uni_output.save(out_dir.replace('.png', f'_{cur_name}.png').replace('.jpg', f'_{cur_name}.png'))
+                    out_dir = out_dir.replace('.jpg', f'_{cur_name}.jpg').replace('.png', f'_{cur_name}.jpg')
+                    visual_uni_output.save(out_dir)
+                    im = cv2.imread(out_dir)
+                    im = cv2.resize(im, (1120, 840))
+                    cv2.imwrite(out_dir, im)
+
             # if args.output:
             #     if os.path.isdir(args.output):
             #         assert os.path.isdir(args.output), args.output

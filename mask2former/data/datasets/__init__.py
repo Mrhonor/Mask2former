@@ -16,5 +16,11 @@ from . import (
     register_ade,
     register_kitti,
     register_wilddash,
-    register_uni
+    register_camvid,
+    register_context,
+    register_voc,
+    register_wilddash_v1,
+    register_uni,
+    register_scannet,
+    
 )

@@ -10,7 +10,7 @@ MODEL:
     KEEP_IMAGENET_HEAD: False  # not used
     DROP_STAGE4: False
     FULL_RES_STEM: False
-    BN_TYPE: "torchbn"  # use syncbn for cityscapes dataset
+    BN_TYPE: "torchsyncbn"  # use syncbn for cityscapes dataset
   AUX_MODE: "train"
   PRETRAINING: True
 DATASETS:

@@ -135,7 +135,7 @@ class SemanticDatasetMapper:
         else:
             sem_seg_gt = None
 
-        if sem_seg_gt is None:
+        if sem_seg_gt is None and self.is_train:
             raise ValueError(
                 "Cannot find 'sem_seg_file_name' for semantic segmentation dataset {}.".format(
                     dataset_dict["file_name"]

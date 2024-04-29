@@ -1,0 +1,231 @@
+city: train (1.0); mapi: On Rails (1.0); bdd: train (0.9956738948822021); coco: train (1.0); 
+mapi: Pedestrian Area (1.0); sun: whiteboard (0.20431256294250488); 
+mapi: Lane Marking - Crosswalk (1.0); coco: baseball glove (1.0); 
+
+mapi: Curb (1.0); idd: curb (0.8574547171592712); 
+mapi: Parking (1.0); idd: drivable fallback or parking (1.0); 
+
+mapi: Barrier (1.0); idd: curb (0.14254526793956757); ade: bar (1.0); 
+mapi: Bike Lane (1.0); ade: stairs (1.0); 
+mapi: Bike Rack (1.0); ade: bannister (1.0); 
+mapi: Street Light (1.0); ade: streetlight (1.0); 
+mapi: Trash Can (1.0); ade: ashcan (1.0); coco: vase (1.0); 
+
+idd: trailer or caravan or vehicle fallback (1.0); ade: step (1.0); 
+ade: crt screen (1.0); 
+
+mapi: Ego Vehicle (1.0); idd: autorickshaw (1.0); ade: computer (1.0); 
+
+mapi: Ground Animal (1.0); coco: dog (1.0); 
+mapi: Crosswalk - Plain (1.0); coco: skis (1.0); 
+coco: tie (1.0); 
+mapi: Snow (1.0); coco: snow (1.0); 
+coco: broccoli (1.0); 
+
+coco: fire hydrant (1.0); 
+coco: gravel (1.0); 
+mapi: Traffic Sign (Back) (1.0); coco: cardboard (1.0); 
+mapi: Car Mount (0.6411856412887573); 
+
+sun: night stand (1.0); idd: obs-str-bar-fallback (1.0); 
+sun: bookshelf (1.0); ade: bookcase (1.0); 
+sun: picture (1.0); ade: painting (1.0); 
+sun: desk (1.0); ade: desk (1.0); 
+sun: clothes (1.0); ade: apparel (1.0); 
+sun: lamp (1.0); ade: lamp (1.0); coco: teddy bear (1.0); 
+sun: bathtub (1.0); ade: bathtub (1.0); 
+coco: handbag (1.0); 
+coco: window-blind (1.0); 
+sun: paper (1.0); coco: paper-merged (1.0); 
+coco: wall-wood (1.0); 
+mapi: Utility Pole (1.0); ade: tree (1.0); coco: tree-merged (1.0); 
+mapi: Terrain (1.0); bdd: terrain (0.40937888622283936); ade: grass (1.0); coco: grass-merged (1.0); 
+ade: house (1.0); coco: house (1.0); 
+ade: sea (1.0); coco: sea (1.0); 
+mapi: Wheeled Slow (0.9843237400054932); sun: floor mat (1.0); ade: rug (1.0); coco: rug-merged (1.0); 
+ade: field (1.0); coco: playingfield (1.0); 
+ade: rock (1.0); coco: wall-stone (1.0); 
+ade: base (1.0); coco: suitcase (1.0); 
+ade: path (1.0); coco: dirt-merged (1.0); 
+ade: river (1.0); coco: river (1.0); 
+ade: coffee table (1.0); coco: dining table (1.0); 
+ade: flower (1.0); coco: flower (1.0); 
+ade: bench (1.0); coco: bench (1.0); 
+ade: stove (1.0); 
+ade: light (1.0); coco: light (1.0); 
+ade: airplane (1.0); coco: airplane (1.0); 
+ade: escalator (1.0); coco: wall-brick (1.0); 
+ade: bottle (1.0); coco: bottle (1.0); 
+coco: cell phone (1.0); 
+ade: plaything (1.0); 
+ade: basket (1.0); coco: cup (1.0); 
+ade: tent (1.0); coco: tent (1.0); 
+sun: bag (1.0); ade: bag (1.0); coco: backpack (1.0); 
+ade: ball (1.0); coco: sports ball (1.0); 
+ade: food (1.0); coco: food-other-merged (1.0); 
+ade: microwave (1.0); coco: microwave (1.0); 
+mapi: Fire Hydrant (1.0); ade: pot (1.0); coco: potted plant (1.0); 
+ade: vase (1.0); 
+ade: plate (1.0); 
+ade: monitor (1.0); coco: laptop (1.0); 
+ade: glass (1.0); coco: wine glass (1.0); 
+ade: clock (1.0); coco: clock (1.0); 
+city: terrain (1.0); bdd: terrain (0.5906211137771606); 
+mapi: Junction Box (1.0); sun: box (1.0); ade: box (1.0); 
+mapi: Rail Track (1.0); idd: non-drivable fallback or rail track (1.0); coco: railroad (1.0); 
+mapi: Billboard (1.0); idd: billboard (1.0); coco: banner (1.0); 
+mapi: Bridge (1.0); idd: tunnel or bridge (1.0); ade: bridge (1.0); coco: bridge (1.0); 
+mapi: Mountain (1.0); ade: mountain (1.0); coco: mountain-merged (1.0); 
+mapi: Sand (1.0); ade: sand (1.0); coco: sand (1.0); 
+mapi: Water (1.0); ade: water (1.0); coco: water-other (1.0); 
+mapi: Boat (1.0); ade: boat (1.0); coco: boat (1.0); 
+sun: floor (1.0); ade: floor (1.0); coco: floor-other-merged (1.0); 
+sun: cabinet (1.0); ade: cabinet (1.0); coco: cabinet-merged (1.0); 
+sun: bed (1.0); ade: bed  (1.0); coco: bed (1.0); 
+sun: sofa (1.0); ade: sofa (1.0); coco: couch (1.0); 
+sun: table (1.0); ade: table (1.0); coco: table-merged (1.0); 
+sun: door (1.0); ade: door (1.0); coco: door-stuff (1.0); 
+sun: window (1.0); ade: windowpane (1.0); coco: window-other (1.0); 
+sun: counter (1.0); ade: counter (1.0); coco: counter (1.0); 
+sun: shelves (1.0); ade: shelf (1.0); coco: shelf (1.0); 
+sun: curtain (1.0); ade: curtain (1.0); coco: curtain (1.0); 
+sun: pillow (1.0); ade: pillow (1.0); coco: pillow (1.0); 
+sun: mirror (1.0); ade: mirror (1.0); coco: mirror-stuff (1.0); 
+sun: ceiling (1.0); ade: ceiling (1.0); coco: ceiling-merged (1.0); 
+sun: books (1.0); ade: book (1.0); coco: book (1.0); 
+sun: television (1.0); ade: television receiver (1.0); coco: tv (1.0); 
+sun: towel (1.0); ade: towel (1.0); coco: towel (1.0); 
+sun: toilet (1.0); ade: toilet (1.0); coco: toilet (1.0); 
+city: rider (1.0); mapi: Other Rider (1.0); bdd: rider (1.0); idd: out of roi or rider (1.0); 
+mapi: Bench (1.0); sun: chair (1.0); ade: chair (1.0); coco: chair (1.0); 
+mapi: Catch Basin (1.0); sun: sink (1.0); ade: sink (1.0); coco: sink (1.0); 
+mapi: Phone Booth (1.0); sun: refridgerator (1.0); ade: refrigerator (1.0); coco: refrigerator (1.0); 
+mapi: Guard Rail (1.0); idd: guard rail (1.0); ade: railing (1.0); coco: stairs (1.0); 
+city: sidewalk (1.0); mapi: Sidewalk (1.0); bdd: sidewalk (1.0); idd: sidewalk (1.0); ade: sidewalk (1.0); 
+city: pole (1.0); mapi: Pole (1.0); bdd: pole (1.0); idd: polegroup or pole (1.0); ade: pole (1.0); 
+city: vegetation (1.0); mapi: Vegetation (1.0); bdd: vegetation (1.0); idd: vegetation (1.0); ade: plant (1.0); 
+city: traffic sign (1.0); mapi: Traffic Sign (Front) (1.0); bdd: traffic sign (1.0); idd: traffic sign (1.0); ade: signboard (1.0); coco: stop sign (1.0); 
+city: road (1.0); mapi: Road (1.0); bdd: road (1.0); idd: road (1.0); ade: road (1.0); coco: road (1.0); 
+city: building (1.0); mapi: Building (1.0); bdd: building (1.0); idd: building (1.0); ade: building (1.0); coco: building-other-merged (1.0); 
+city: fence (1.0); mapi: Fence (1.0); bdd: fence (1.0); idd: fence (1.0); ade: fence (1.0); coco: fence-merged (1.0); 
+city: traffic light (1.0); mapi: Traffic Light (1.0); bdd: traffic light (1.0); idd: traffic light (1.0); ade: traffic light (1.0); coco: traffic light (1.0); 
+city: sky (1.0); mapi: Sky (1.0); bdd: sky (1.0); idd: sky or fallback background (1.0); ade: sky (1.0); coco: sky-other-merged (1.0); 
+city: car (1.0); mapi: Car (1.0); bdd: car (1.0); idd: car (1.0); ade: car (1.0); coco: car (1.0); 
+city: truck (1.0); mapi: Truck (1.0); bdd: truck (1.0); idd: truck (1.0); ade: truck (1.0); coco: truck (1.0); 
+city: bus (1.0); mapi: Bus (1.0); bdd: bus (1.0); idd: bus (1.0); ade: bus (1.0); coco: bus (1.0); 
+city: motorcycle (1.0); mapi: Motorcycle (1.0); bdd: motorcycle (1.0); idd: motorcycle (1.0); ade: minibike (1.0); coco: motorcycle (1.0); 
+city: bicycle (1.0); mapi: Bicycle (1.0); bdd: bicycle (1.0); idd: bicycle (0.9999104142189026); ade: bicycle (1.0); coco: bicycle (1.0); 
+city: wall (1.0); mapi: Wall (1.0); sun: wall (1.0); bdd: wall (1.0); idd: wall (1.0); ade: wall (1.0); coco: wall-other-merged (1.0); 
+city: person (1.0); mapi: Person (1.0); sun: person (1.0); bdd: person (1.0); idd: person or animal (1.0); ade: person (1.0); coco: person (1.0); 
+mapi: Service Lane (1.0); 
+
+
+mapi: Lane Marking - General (1.0); 
+
+mapi: Traffic Sign Frame (1.0); 
+
+
+mapi: Banner (1.0); ade: flag (1.0); 
+ade: earth (1.0); 
+ade: armchair (1.0); 
+ade: seat (1.0); 
+ade: wardrobe (1.0); 
+ade: cushion (1.0); 
+
+
+sun: dresser (1.0); ade: chest of drawers (1.0); 
+ade: skyscraper (1.0); 
+mapi: Tunnel (1.0); ade: fireplace (1.0); 
+mapi: Other Vehicle (1.0); ade: grandstand (1.0); 
+ade: runway (1.0); 
+ade: case (1.0); 
+ade: pool table (1.0); 
+sun: shower curtain (1.0); ade: screen door (1.0); 
+ade: stairway (1.0); 
+sun: blinds (1.0); ade: blind (1.0); 
+ade: hill (1.0); coco: bear (0.9794963598251343); 
+ade: countertop (1.0); 
+ade: palm (1.0); 
+ade: kitchen island (1.0); 
+ade: arcade machine (1.0); 
+ade: hovel (1.0); 
+ade: tower (1.0); 
+ade: chandelier (1.0); 
+ade: awning (1.0); 
+ade: booth (1.0); 
+ade: dirt track (1.0); 
+ade: land (1.0); 
+
+ade: buffet (1.0); 
+ade: poster (1.0); 
+mapi: Trailer (1.0); ade: stage (1.0); 
+ade: ship (1.0); 
+ade: fountain (1.0); 
+ade: conveyer belt (1.0); 
+ade: canopy (1.0); 
+ade: washer (1.0); 
+ade: swimming pool (1.0); 
+ade: stool (1.0); 
+ade: barrel (1.0); coco: snowboard (1.0); 
+ade: waterfall (1.0); 
+ade: cradle (1.0); 
+ade: oven (1.0); 
+ade: tank (1.0); 
+ade: trade name (1.0); 
+ade: animal (1.0); 
+ade: lake (1.0); 
+ade: dishwasher (1.0); 
+sun: whiteboard (0.7956874370574951); ade: screen (1.0); 
+
+ade: sculpture (1.0); 
+
+ade: sconce (1.0); 
+ade: fan (1.0); 
+ade: pier (1.0); 
+ade: bulletin board (1.0); 
+
+ade: radiator (1.0); 
+coco: parking meter (1.0); 
+coco: bird (1.0); 
+ade: swivel chair (1.0); coco: cat (1.0); 
+mapi: Car Mount (0.2886115312576294); coco: horse (1.0); 
+coco: sheep (1.0); 
+coco: cow (1.0); 
+mapi: Manhole (0.9163243770599365); coco: elephant (1.0); 
+
+ade: ottoman (1.0); coco: zebra (1.0); 
+ade: blanket (1.0); coco: giraffe (1.0); 
+coco: umbrella (1.0); 
+
+
+
+
+coco: skateboard (1.0); 
+coco: surfboard (1.0); 
+coco: tennis racket (1.0); 
+
+coco: spoon (1.0); 
+coco: bowl (1.0); 
+coco: banana (1.0); 
+coco: apple (1.0); 
+coco: sandwich (1.0); 
+coco: orange (1.0); 
+coco: carrot (1.0); 
+coco: hot dog (1.0); 
+ade: tray (1.0); coco: pizza (1.0); 
+coco: donut (1.0); 
+coco: cake (1.0); 
+coco: mouse (1.0); 
+coco: remote (1.0); 
+coco: keyboard (1.0); 
+coco: toaster (1.0); 
+coco: scissors (1.0); 
+
+coco: toothbrush (1.0); 
+coco: blanket (1.0); 
+coco: floor-wood (1.0); 
+coco: platform (1.0); 
+coco: roof (1.0); 
+coco: wall-tile (1.0); 
+coco: pavement-merged (1.0); 
+coco: rock-merged (1.0); 

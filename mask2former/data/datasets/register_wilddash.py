@@ -278,6 +278,7 @@ def register_wilddash2_new():
         stuff_classes= ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void'],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors = [[214, 92, 19], [97, 187, 159], [236, 2, 131], [154, 172, 132], [174, 203, 111], [145, 208, 42], [180, 241, 180], [126, 101, 165], [153, 29, 134], [169, 102, 174], [128, 109, 69], [155, 117, 111], [225, 115, 77], [198, 221, 182], [24, 192, 253], [14, 159, 57], [81, 255, 160], [79, 127, 244], [12, 50, 106], [103, 81, 234], [224, 216, 151], [109, 64, 73], [215, 48, 75], [26, 184, 83], [226, 27, 43], [160, 111, 0]],
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
@@ -334,6 +335,7 @@ def register_wilddash2_new_test():
         stuff_classes= ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void'],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors = [[214, 92, 19], [97, 187, 159], [236, 2, 131], [154, 172, 132], [174, 203, 111], [145, 208, 42], [180, 241, 180], [126, 101, 165], [153, 29, 134], [169, 102, 174], [128, 109, 69], [155, 117, 111], [225, 115, 77], [198, 221, 182], [24, 192, 253], [14, 159, 57], [81, 255, 160], [79, 127, 244], [12, 50, 106], [103, 81, 234], [224, 216, 151], [109, 64, 73], [215, 48, 75], [26, 184, 83], [226, 27, 43], [0, 0, 0]],
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )

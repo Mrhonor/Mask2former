@@ -147,7 +147,6 @@ class HRNet_W48_ARCH(nn.Module):
         backbone = build_backbone(cfg)
         # sem_seg_head = build_sem_seg_head(cfg, 720)
         sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
-        gnn_model = build_GNN_module(cfg)
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
         ohem_thresh = cfg.LOSS.OHEM_THRESH
@@ -156,6 +155,11 @@ class HRNet_W48_ARCH(nn.Module):
         graph_node_features = gen_graph_node_feature(cfg)
         init_gnn_iters = cfg.MODEL.GNN.init_stage_iters
         Pretraining = cfg.MODEL.PRETRAINING
+        if Pretraining:
+            gnn_model = None
+        else:
+            gnn_model = build_GNN_module(cfg)
+            
         gnn_iters = cfg.MODEL.GNN.GNN_ITERS
         seg_iters = cfg.MODEL.GNN.SEG_ITERS
         first_stage_gnn_iters = cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS
@@ -320,6 +324,7 @@ class HRNet_W48_ARCH(nn.Module):
                         # logger.info(f"logit shape:{logit.shape}")
                         processed_results.append({"sem_seg": logit})
                 else:
+                    # logger.info(f"{len(bi_graphs)}")
                     if self.with_datasets_aux:
                         ori_logits = torch.einsum('bchw, nc -> bnhw', outputs['emb'], unify_prototype[self.total_cats:])
                     else:
@@ -475,6 +480,9 @@ class HRNet_W48_ARCH(nn.Module):
     
     def get_unify_prototype(self):
         return self.proj_head.unify_prototype
+
+    def set_dataset_adapter(self, dataset_adapter):
+        self.dataset_adapter = dataset_adapter
 
     def set_dataset_adapter(self, dataset_adapter):
         self.dataset_adapter = dataset_adapter
@@ -668,13 +676,16 @@ class HRNet_W48_ARCH(nn.Module):
             self.unify_prototype.requires_grad=grad
 
     def get_bipart_graph(self):
-        _, ori_bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
-        bi_graphs = []
-        if len(ori_bi_graphs) == 2*self.n_datasets:
-            for j in range(0, len(ori_bi_graphs), 2):
-                bi_graphs.append(ori_bi_graphs[j+1].detach())
+        if self.Pretraining:
+            bi_graphs = self.proj_head.bipartite_graphs
         else:
-            bi_graphs = [bigh.detach() for bigh in ori_bi_graphs]
+            _, ori_bi_graphs, _, _ = self.gnn_model(self.graph_node_features)
+            bi_graphs = []
+            if len(ori_bi_graphs) == 2*self.n_datasets:
+                for j in range(0, len(ori_bi_graphs), 2):
+                    bi_graphs.append(ori_bi_graphs[j+1].detach())
+            else:
+                bi_graphs = [bigh.detach() for bigh in ori_bi_graphs]
 
         return bi_graphs
         

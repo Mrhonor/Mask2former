@@ -26,5 +26,5 @@ MODEL:
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
-    INIT_ADJ_PATH: "output/init_adj_7_datasets.pt"
+    INIT_ADJ_PATH: None
     N_POINTS: 1024

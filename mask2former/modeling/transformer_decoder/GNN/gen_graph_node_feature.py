@@ -814,7 +814,7 @@ def gen_graph_node_feature_clip(cfg):
             img_feature_vecs = gen_image_features(configer, i)
             img_feat_tensor = torch.cat(img_feature_vecs, dim=0)
             
-            text_feature_vecs = get_encode_lb_vec(configer, i)[0]
+            text_feature_vecs = get_encode_lb_vec_clip(configer, i)[0]
             this_graph_node_features = torch.cat([text_feature_vecs, img_feat_tensor], dim=1)
             
             print("gen finished")
@@ -825,7 +825,6 @@ def gen_graph_node_feature_clip(cfg):
     out_features = torch.cat(out_features, dim=0)
     print(out_features.shape)
     return out_features 
-    
     
     # if not osp.exists(save_pth): os.makedirs(save_pth)
     

@@ -871,10 +871,10 @@ class Learnable_Topology_BGNN_llama(nn.Module):
                 else:
                     return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI)
             else:
-                # if self.GumbelSoftmax:
-                #     self.GumbelSoftmax = False
-                #     _, non_norm_adj_mI = self.calc_adjacency_matrix(feat1)
-                #     self.GumbelSoftmax = True
+                if self.GumbelSoftmax:
+                    self.GumbelSoftmax = False
+                    _, non_norm_adj_mI = self.calc_adjacency_matrix(feat1)
+                    self.GumbelSoftmax = True
                                 
                 # return feat_out[self.total_cats:], self.sep_bipartite_graphs(non_norm_adj_mI)
                 if self.with_datasets_aux:

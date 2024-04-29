@@ -3,7 +3,7 @@ MODEL:
   META_ARCHITECTURE: "HRNet_W48_Finetune_ARCH"
   PRETRAINING: False
   SEM_SEG_HEAD:
-    NAME: "HRNet_W48"
+    NAME: "HRNet_W48_llama"
     OUTPUT_FEAT_DIM: 512
     BN_TYPE: "torchsyncbn"
   GNN:

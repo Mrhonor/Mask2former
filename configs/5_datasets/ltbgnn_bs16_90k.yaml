@@ -22,9 +22,4 @@ MODEL:
     GNN_type: "GSAGE"
     with_datasets_aux: False
     init_stage_iters: -1
-    isGumbelSoftmax: False
-    GNN_ITERS: 20000
-    SEG_ITERS: 20000
-    FIRST_STAGE_GNN_ITERS: 15000
-    INIT_ADJ_PATH: "output/init_adj_5_datasets_2.pt"
     N_POINTS: 1024

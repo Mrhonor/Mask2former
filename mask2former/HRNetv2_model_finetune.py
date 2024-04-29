@@ -74,11 +74,14 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         self.iters = 0
         self.total_cats = 0
         # self.datasets_cats = []
+        self.dataset_adapter = []
         for i in range(0, self.n_datasets):
             # self.datasets_cats.append(self.configer.get('dataset'+str(i+1), 'n_cats'))
             self.total_cats += self.datasets_cats[i]
+            self.dataset_adapter.append(None)
  
         self.criterion = OhemCELoss(ohem_thresh, ignore_lb)
+        
         
         # 初始化 grad
         self.initial = False
@@ -154,6 +157,9 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         images = ImageList.from_tensors(images, -1)
 
         if self.training:
+            targets = [x["sem_seg"].cuda() for x in batched_inputs]
+            targets = self.prepare_targets(targets, images)
+            targets = torch.cat(targets, dim=0)
             dataset_lbs = [x["dataset_id"] for x in batched_inputs]
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
             targets = [x["sem_seg"].cuda() for x in batched_inputs]
@@ -181,6 +187,9 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             for id, logit in enumerate(remap_logits):
                 logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 loss = self.criterion(logits, targets[dataset_lbs==id])
+                # logger.info(f"loss:{loss}")
+                if torch.isnan(loss):
+                    continue
                 losses[f'loss_ce{id}'] = loss
             
             if self.with_datasets_aux:
@@ -188,6 +197,8 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 
                     aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
+                    if torch.isnan(aux_loss):
+                        continue
                     losses[f'loss_aux{idx}'] = aux_loss
             for k in list(losses.keys()):
                 if k in self.loss_weight_dict:
@@ -203,10 +214,37 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 width = input_per_image.get("width", image_size[1])
                 logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                # logit = F.interpolate(logit, size=(height, width), mode="bilinear", align_corners=True)[0]
-                # uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                # uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
-                # uni_logits = F.interpolate(uni_logits, size=(height, width), mode="bilinear", align_corners=True)[0]
+                # uni_logits = logit
+                uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
+                # dataset_lbs = 0
+                if self.dataset_adapter[dataset_lbs] is not None:
+                    # logger.info(uni_logits.shape)
+                    uni_logits = F.softmax(uni_logits, dim=0)
+                    max_logits, preds = torch.max(uni_logits, dim=0, keepdim=True)
+                    # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                    preds = preds.long()
+                    # preds[max_logits < 0.3] = 255
+                    this_mseg_map = self.dataset_adapter[dataset_lbs]
+                    # logger.info(this_mseg_map)      
+
+                    preds = this_mseg_map[preds].long()
+                        # 创建一个与原张量相同大小的全零张量
+                    output = torch.zeros(int(torch.max(this_mseg_map)), preds.shape[1], preds.shape[2]).cuda()
+                    # preds[max_logits < 0.3] = int(torch.max(this_mseg_map)) - 1
+                    # 将最大值所在位置置为 1
+                    output.scatter_(0, preds, 1)
+                    logit = output
+                
+                # logit = F.softmax(logit, dim=0)
+                # max_logits, preds = torch.max(logit, dim=0, keepdim=True)
+                # # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+                # preds = preds.long()
+                # output = torch.zeros(26, preds.shape[1], preds.shape[2]).cuda()
+                # preds[max_logits < 0.3] = 25
+                # # 将最大值所在位置置为 1
+                # output.scatter_(0, preds, 1)
+                # logit = output
                 # logger.info(f"logit shape:{logit.shape}")
                 processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
             return processed_results             
@@ -308,21 +346,10 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
     
     def set_bipartite_graphs(self, bi_graphs):
-        self.proj_head.set_bipartite_graphs(bi_graphs)
-        
-        # if len(bi_graphs) == 2 * self.n_datasets:
-        #     for i in range(0, self.n_datasets):
-        #         self.bipartite_graphs[i] = nn.Parameter(
-        #             bi_graphs[2*i], requires_grad=False
-        #             )
-        # else:
-        #     # print("bi_graphs len:", len(bi_graphs))
-        #     for i in range(0, self.n_datasets):
-        #         # print("i: ", i)
-        #         self.bipartite_graphs[i] = nn.Parameter(
-        #             bi_graphs[i], requires_grad=False
-        #             )
-            
+        self.proh_head.set_bipartite_graphs(bi_graphs)
+
+    def set_dataset_adapter(self, dataset_adapter):
+        self.dataset_adapter = dataset_adapter
         
     def set_unify_prototype(self, unify_prototype, grad=False):
         if self.with_datasets_aux and unify_prototype.shape[0] != self.unify_prototype.shape[0]:

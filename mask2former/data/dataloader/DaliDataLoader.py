@@ -900,13 +900,20 @@ coco_data_labels_info = [
     
 
 class LoaderAdapter:
-    def __init__(self, cfg, aux_mode='train', dataset_id=None) -> None:
-        if aux_mode == 'train':
-            self.datasets_name = cfg.DATASETS.TRAIN
-        elif aux_mode == 'eval':
-            self.datasets_name = cfg.DATASETS.EVAL
+    def __init__(self, cfg, aux_mode='train', dataset_id=None, datasets_name=None) -> None:
+        print(f"LoaderAdapter:{aux_mode}, dataset_id:{dataset_id}")
+        if datasets_name is not None:
+            self.datasets_name = datasets_name
         else:
-            self.datasets_name = cfg.DATASETS.TEST
+            if aux_mode == 'train':
+                self.datasets_name = cfg.DATASETS.TRAIN
+            elif aux_mode == 'eval':
+                self.datasets_name = cfg.DATASETS.EVAL
+            elif aux_mode == 'unseen':
+                self.datasets_name = cfg.DATASETS.TRAIN
+            else:
+                self.datasets_name = cfg.DATASETS.TEST
+        
         dataset = [get_detection_dataset_dicts(
             name,
             filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
@@ -921,8 +928,6 @@ class LoaderAdapter:
         mapper = []
         for i in range(len(dataset)):
             should_lkt = True
-            # if i==1 or i == 2 or i == 3 or i == 4 or i == 6:
-            #     should_lkt = True
 
             mapper.append(SemanticDatasetMapper(cfg, True, i, should_lkt))
 
@@ -939,9 +944,14 @@ class LoaderAdapter:
             #     Log.info(f"evaluate {self.datasets_name[dataset_id-1]}")
             #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id-1], mapper=mapper)
             # else:
-            mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
-            Log.info(f"evaluate {self.datasets_name[dataset_id]}")
-            self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
+            if dataset_id >= len(self.datasets_name):
+                mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
+                Log.info(f"evaluate {self.datasets_name[0]}")
+                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[0], mapper=mapper)            
+            else:
+                mapper = SemanticDatasetMapper(cfg, False, dataset_id, True)
+                Log.info(f"evaluate {self.datasets_name[dataset_id]}")
+                self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id], mapper=mapper)
         # else:
         #     self.dls = build_detection_test_loader(cfg, dataset_name=self.datasets_name[dataset_id])
             

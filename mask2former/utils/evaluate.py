@@ -560,7 +560,11 @@ class find_unuse_hook(HookBase):
                                 total_data_time = 0
                                 total_compute_time = 0
                                 total_eval_time = 0
-
+                            for x in inputs:
+                                im = x["image"]
+                                if im.shape[-2] > 2200 or im.shape[-1] > 2200:
+                                    x["image"] = F.interpolate(im[None], size=(int(im.shape[-2]*0.5), int(im.shape[-1]*0.5)), mode='bilinear', align_corners=True).squeeze(0)
+                                    x["sem_seg"] = F.interpolate(x["sem_seg"].float()[None][None], size=(int(im.shape[-2]*0.5), int(im.shape[-1]*0.5)), mode='nearest').squeeze().long()
                             start_compute_time = time.perf_counter()
                             dict.get(callbacks or {}, "before_inference", lambda: None)()
                             outputs = model(inputs)
@@ -670,6 +674,7 @@ class find_unuse_hook(HookBase):
                     
                 for index in range(0, n_classes):
                     if index not in buckets:
+                        logger.info(f'index not in buckets: {index}')
                         buckets[index] = []
                     print("\"{}\": {}".format(index, buckets[index]))    
                 
@@ -741,6 +746,11 @@ class eval_link_hook(HookBase):
                                 total_eval_time = 0
 
                             start_compute_time = time.perf_counter()
+                            for x in inputs:
+                                im = x["image"]
+                                if im.shape[-2] > 3500 or im.shape[-1] > 3500:
+                                    x["image"] = F.interpolate(im[None], size=(int(im.shape[-2]*0.75), int(im.shape[-1]*0.75)), mode='bilinear', align_corners=True).squeeze(0)
+                                    x["sem_seg"] = F.interpolate(x["sem_seg"].float()[None][None], size=(int(im.shape[-2]*0.75), int(im.shape[-1]*0.75)), mode='nearest').squeeze().long()
                             dict.get(callbacks or {}, "before_inference", lambda: None)()
                             outputs = model(inputs)
                             dict.get(callbacks or {}, "after_inference", lambda: None)()
