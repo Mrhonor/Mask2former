@@ -299,7 +299,7 @@ class Trainer(DefaultTrainer):
         memo: Set[torch.nn.parameter.Parameter] = set()
         for module_name, module in model.named_modules():
             for module_param_name, value in module.named_parameters(recurse=False):
-                if not value.requires_grad and 'adj_matrix' not in module_param_name:
+                if not value.requires_grad and 'unify_prototype' not in module_param_name:
                     continue
                 # Avoid duplicating parameters
                 if value in memo:
@@ -418,9 +418,9 @@ def main(args):
     
     trainer = Trainer(cfg)
     # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
-    # trainer.register_hooks([iter_info_hook()])
+    trainer.register_hooks([iter_info_hook()])
     # trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
-    trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
+    # trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 

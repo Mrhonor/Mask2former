@@ -9,10 +9,12 @@ import cv2
 import torch
 
 from detectron2.data import MetadataCatalog
+from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.modeling import build_model
 from detectron2.engine.defaults import DefaultPredictor
 from detectron2.utils.video_visualizer import VideoVisualizer
 from detectron2.utils.visualizer import ColorMode, Visualizer
-
+import logging
 
 class VisualizationDemo(object):
     def __init__(self, cfg, instance_mode=ColorMode.IMAGE, parallel=False):
@@ -23,9 +25,9 @@ class VisualizationDemo(object):
             parallel (bool): whether to run the model in different processes from visualization.
                 Useful since the visualization logic can be slow.
         """
-        self.metadata = MetadataCatalog.get(
-            cfg.DATASETS.TEST[0] if len(cfg.DATASETS.TEST) else "__unused"
-        )
+        self.metadata = [MetadataCatalog.get(
+            ds 
+        ) for ds in cfg.DATASETS.TEST]
         self.metadata_uni = MetadataCatalog.get(
             "uni"
         )
@@ -37,7 +39,7 @@ class VisualizationDemo(object):
             num_gpu = torch.cuda.device_count()
             self.predictor = AsyncPredictor(cfg, num_gpus=num_gpu)
         else:
-            self.predictor = DefaultPredictor(cfg)
+            self.predictor = MyPredictor(cfg)
 
     def run_on_image(self, image):
         """
@@ -52,8 +54,11 @@ class VisualizationDemo(object):
         predictions = self.predictor(image)
         # Convert image from OpenCV BGR format to Matplotlib RGB format.
         image = image[:, :, ::-1]
-        visualizer = Visualizer(image, self.metadata, instance_mode=self.instance_mode)
+        logger = logging.getLogger(__name__)
+        logger.info(image.shape)
+        visualizer = [Visualizer(image, md, instance_mode=self.instance_mode) for md in self.metadata]
         visualizer_uni = Visualizer(image, self.metadata_uni, instance_mode=self.instance_mode)
+        # visualizer_uni = Visualizer(image, self.metadata[5], instance_mode=self.instance_mode)
         if "panoptic_seg" in predictions:
             panoptic_seg, segments_info = predictions["panoptic_seg"]
             vis_output = visualizer.draw_panoptic_seg_predictions(
@@ -61,11 +66,14 @@ class VisualizationDemo(object):
             )
         else:
             if "sem_seg" in predictions:
-                vis_output = visualizer.draw_sem_seg(
-                    predictions["sem_seg"].argmax(dim=0).to(self.cpu_device)
-                )
-                vis_output_uni = visualizer_uni.draw_sem_seg(
-                    predictions["uni_logits"].argmax(dim=0).to(self.cpu_device)
+                # vis_output = [visualizer[i].draw_sem_seg(
+                #     predictions["sem_seg"][i].argmax(dim=0).to(self.cpu_device)
+                # ) for i in range(len(visualizer))]
+                # vis_output_uni = visualizer_uni.draw_sem_seg(
+                #     predictions["uni_logits"].argmax(dim=0).to(self.cpu_device), area_threshold=500
+                # )
+                vis_output_uni = visualizer[6].draw_sem_seg(
+                    predictions["sem_seg"].argmax(dim=0).to(self.cpu_device), alpha=1
                 )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)
@@ -133,6 +141,77 @@ class VisualizationDemo(object):
         else:
             for frame in frame_gen:
                 yield process_predictions(frame, self.predictor(frame))
+
+class MyPredictor:
+    """
+    Create a simple end-to-end predictor with the given config that runs on
+    single device for a single input image.
+
+    Compared to using the model directly, this class does the following additions:
+
+    1. Load checkpoint from `cfg.MODEL.WEIGHTS`.
+    2. Always take BGR image as the input and apply conversion defined by `cfg.INPUT.FORMAT`.
+    3. Apply resizing defined by `cfg.INPUT.{MIN,MAX}_SIZE_TEST`.
+    4. Take one input image and produce a single output, instead of a batch.
+
+    This is meant for simple demo purposes, so it does the above steps automatically.
+    This is not meant for benchmarks or running complicated inference logic.
+    If you'd like to do anything more complicated, please refer to its source code as
+    examples to build and use the model manually.
+
+    Attributes:
+        metadata (Metadata): the metadata of the underlying dataset, obtained from
+            cfg.DATASETS.TEST.
+
+    Examples:
+    ::
+        pred = DefaultPredictor(cfg)
+        inputs = cv2.imread("input.jpg")
+        outputs = pred(inputs)
+    """
+
+    def __init__(self, cfg):
+        self.cfg = cfg.clone()  # cfg can be modified by model
+        self.model = build_model(self.cfg)
+        self.model.eval()
+        if len(cfg.DATASETS.TEST):
+            self.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
+
+        checkpointer = DetectionCheckpointer(self.model)
+        checkpointer.load(cfg.MODEL.WEIGHTS)
+
+        # self.aug = T.ResizeShortestEdge(
+        #     [cfg.INPUT.MIN_SIZE_TEST, cfg.INPUT.MIN_SIZE_TEST], cfg.INPUT.MAX_SIZE_TEST
+        # )
+
+        self.input_format = cfg.INPUT.FORMAT
+        assert self.input_format in ["RGB", "BGR"], self.input_format
+
+    def __call__(self, original_image):
+        """
+        Args:
+            original_image (np.ndarray): an image of shape (H, W, C) (in BGR order).
+
+        Returns:
+            predictions (dict):
+                the output of the model for one image only.
+                See :doc:`/tutorials/models` for details about the format.
+        """
+        with torch.no_grad():  # https://github.com/sphinx-doc/sphinx/issues/4258
+            # Apply pre-processing to image.
+            if self.input_format == "RGB":
+                # whether the model expects BGR inputs or RGB
+                original_image = original_image[:, :, ::-1]
+            height, width = original_image.shape[:2]
+            # image = self.aug.get_transform(original_image).apply_image(original_image)
+            image = original_image
+            image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+            image.to(self.cfg.MODEL.DEVICE)
+
+            inputs = {"image": image, "height": height, "width": width}
+
+            predictions = self.model([inputs])[0]
+            return predictions
 
 
 class AsyncPredictor:

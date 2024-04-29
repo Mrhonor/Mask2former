@@ -10,7 +10,7 @@ from detectron2.structures import Boxes, ImageList, Instances, BitMasks
 from detectron2.utils.memory import retry_if_cuda_oom
 from detectron2.modeling.postprocessing import sem_seg_postprocess
 from .modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
-from .modeling.transformer_decoder.GNN.ltbgnn import build_GNN_module
+from .modeling.transformer_decoder.GNN.ltbgnn_llama import build_GNN_module
 from .modeling.backbone.hrnet_backbone import HighResolutionNet
 from .modeling.loss.ohem_ce_loss import OhemCELoss
 from timm.models.layers import trunc_normal_

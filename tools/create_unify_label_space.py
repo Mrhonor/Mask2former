@@ -50,10 +50,11 @@ if __name__ == '__main__':
     cats = {}
     print('Loading')
     unified_label_num = len(unified_label)
+    print(f'unified_label_num:{unified_label_num}')
     total_cats = 0
-    n_datasets = 5
-    # n_cats = [19, 64, 37, 19, 26, 150, 133]
-    n_cats = [19, 64, 19, 26, 26]
+    n_datasets = 7
+    n_cats = [19, 64, 37, 19, 26, 150, 133]
+    # n_cats = [19, 64, 19, 26, 26]
     sta_cats = []
     for i in range(n_datasets):
         sta_cats.append(total_cats)
@@ -68,4 +69,4 @@ if __name__ == '__main__':
             # else:
             #     print("!")
 
-    torch.save(target_bi, 'init_adj_5_datasets_2.pt')
+    torch.save(target_bi, f'init_adj_7_datasets_{unified_label_num}.pt')

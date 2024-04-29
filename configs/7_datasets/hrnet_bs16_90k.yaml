@@ -2,13 +2,14 @@ _BASE_: Base-Cityscapes-SemanticSegmentation_hrnet.yaml
 MODEL:
   META_ARCHITECTURE: "HRNet_W48_ARCH"
   SEM_SEG_HEAD:
-    NAME: "HRNet_W48_llama"
+    NAME: "HRNet_W48_mulhead"
     OUTPUT_FEAT_DIM: 512
     WITH_DATASETS_AUX: False
-    BN_TYPE: "torchbn"
+    BN_TYPE: "torchsyncbn"
   GNN:
-    NFEAT: 1024
-    NFEAT_OUT: 512
+    GNN_MODEL_NAME: "Learnable_Topology_BGNN_llama"
+    NFEAT: 4096
+    NFEAT_OUT: 2048
     nfeat_adj: 256
     adj_feat_dim: 128
     dropout_rate: 0.5
@@ -20,9 +21,10 @@ MODEL:
     mse_or_adv: "None"
     GNN_type: "GSAGE"
     with_datasets_aux: False
-    init_stage_iters: 10000
+    init_stage_iters: -1
     isGumbelSoftmax: False
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
-    INIT_ADJ_PATH: "output/init_adj_7_datasets_2.pt"
+    INIT_ADJ_PATH: None
+    N_POINTS: 1024

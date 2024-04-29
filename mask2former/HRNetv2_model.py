@@ -165,7 +165,8 @@ class HRNet_W48_ARCH(nn.Module):
         with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
         n_points = cfg.MODEL.GNN.N_POINTS
         # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 3, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 3, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
-        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 2, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 3, "loss_ce5": 3, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 2, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 3, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
+        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
+        # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 2, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 3, "loss_ce5": 3, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 2, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 3, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
         return {
             'backbone': backbone,
             'sem_seg_head': sem_seg_head,
@@ -213,14 +214,16 @@ class HRNet_W48_ARCH(nn.Module):
         # images = ImageList.from_tensors(images, 4)#self.size_divisibility)
         # else:
         images = ImageList.from_tensors(images, -1)
-        targets = [x["sem_seg"].cuda() for x in batched_inputs]
-        targets = self.prepare_targets(targets, images)
-        targets = torch.cat(targets, dim=0)
+
         if self.training:
             dataset_lbs = [x["dataset_id"] for x in batched_inputs]
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
+            targets = [x["sem_seg"].cuda() for x in batched_inputs]
+            targets = self.prepare_targets(targets, images)
+            targets = torch.cat(targets, dim=0)
         else:
             dataset_lbs = int(batched_inputs[0]["dataset_id"])
+            # dataset_lbs = 0
         
         if self.Pretraining:
             features = self.backbone(images.tensor)
@@ -243,6 +246,7 @@ class HRNet_W48_ARCH(nn.Module):
             else:
                 processed_results = []
                 for logit, input_per_image, image_size, uni_logit in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
+                # for logit, input_per_image, image_size in zip(outputs['logits'], batched_inputs, images.image_sizes):
                     height = input_per_image.get("height", image_size[0])
                     width = input_per_image.get("width", image_size[1])
                     logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
@@ -251,7 +255,7 @@ class HRNet_W48_ARCH(nn.Module):
                     uni_logit = F.interpolate(uni_logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     
                     uni_logit = retry_if_cuda_oom(sem_seg_postprocess)(uni_logit, image_size, height, width)
-                    # logger.info(f"logit shape:{logit.shape}")
+                    # logger.info(f"logit shape:{uni_logit.shape}")
                     if self.dataset_adapter[0] is not None:
                     # logger.info(uni_logits.shape)
                         preds = torch.argmax(logit, dim=0, keepdim=True).long()
@@ -340,7 +344,9 @@ class HRNet_W48_ARCH(nn.Module):
     def clac_pretrain_loss(self, batched_inputs, images, targets, dataset_lbs, outputs):
         losses = {}
         for idx, logit in enumerate(outputs['logits']):
+            
             logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+            # logger.info(f"logits:{logits.shape}, target:{targets[dataset_lbs==idx].shape}")
             loss = self.criterion(logits, targets[dataset_lbs==idx])
                     
             if torch.isnan(loss):
@@ -454,6 +460,17 @@ class HRNet_W48_ARCH(nn.Module):
                 losses['loss_orth'] = self.similarity_dsb(unify_prototype[self.total_cats:])
             else:
                 losses['loss_orth'] = self.similarity_dsb(unify_prototype)               
+        # if torch.isnan(losses['loss_orth']):
+        #     proto_vecs = unify_prototype
+        #     z = torch.mm(proto_vecs, proto_vecs.t())  # size N x C_seen
+        #     # if torch.isnan(F.softmax(z / self.temperature, dim=1)).any():
+        #     #     logger.info(f"got nan in softmax:{F.softmax(z / self.temperature, dim=1)}")
+            
+        #     # if torch.isnan(F.log_softmax(z / self.temperature, dim=1)).any():
+        #     #     logger.info(f"got nan in log_softmax:{F.log_softmax(z / self.temperature, dim=1)}")
+        #     #     logger.info(f"torch.max:{torch.max(z)}, min:{torch.min(z)}")
+        #     #     logger.info(f"softmax: torch.max:{torch.max(F.softmax(z / self.temperature, dim=1))}, min:{torch.min(F.softmax(z / self.temperature, dim=1))}")
+        #     raise Exception(f"loss_orth nan, z:{torch.max(unify_prototype)}, zmin:{torch.min(z / self.temperature)} unify_prototype:{torch.isnan(unify_prototype).any()}, softmax:{torch.isnan(F.softmax(z / self.temperature, dim=1)).any()}, log_softmax:{torch.isnan(F.log_softmax(z / self.temperature, dim=1)).any()}")
         return losses
     
     def get_unify_prototype(self):
@@ -464,7 +481,7 @@ class HRNet_W48_ARCH(nn.Module):
 
     def env_init(self, iters):
         if self.initial == False:
-            self.alter_iters = torch.zeros(1)
+            # self.alter_iters = torch.zeros(1)
             logger.info(f"initial: train_seg_or_gnn: {self.train_seg_or_gnn}, alter_iter:{self.alter_iters}")
             if self.train_seg_or_gnn == self.GNN:
                 self.backbone.req_grad(False)
@@ -690,13 +707,26 @@ class HRNet_W48_ARCH(nn.Module):
 
         # dot similarity between features and centroids
         z = torch.mm(proto_vecs, proto_vecs.t())  # size N x C_seen
+        z = z / self.temperature
+        # z = z - torch.max(z, dim=1, keepdim=True)[0]
+        
+        # if torch.isnan(F.softmax(z / self.temperature, dim=1)).any():
+        #     logger.info(f"got nan in softmax:{F.softmax(z / self.temperature, dim=1)}")
+        
+        # if torch.isnan(F.log_softmax(z, dim=1)).any():
+        #     logger.info(f"got nan in log_softmax:{F.log_softmax(z, dim=1)}")
+        #     logger.info(f"torch.max:{torch.max(z)}, min:{torch.min(z)}")
+        #     logger.info(f"softmax: torch.max:{torch.max(F.softmax(z, dim=1))}, min:{torch.min(F.softmax(z, dim=1))}")
+        
 
         # entropy loss to push each feature to be similar to only one class prototype (no supervision)
         if reduce == 'mean':
-            loss = -1 * torch.mean(F.softmax(z / self.temperature, dim=1) * F.log_softmax(z / self.temperature, dim=1))
+            loss = -1 * torch.mean(F.softmax(z, dim=1) * F.log_softmax(z, dim=1))
         elif reduce == 'sum':
-            loss = -1 * torch.sum(F.softmax(z / self.temperature, dim=1) * F.log_softmax(z / self.temperature, dim=1))
-            
+            loss = -1 * torch.sum(F.softmax(z, dim=1) * F.log_softmax(z, dim=1))
+        if torch.isnan(loss).any():
+            logger.info(f"got nan in loss")
+            raise Exception(f"loss_orth nan, z:{torch.max(z)}, zmin:{torch.min(z)} unify_prototype:{torch.isnan(z).any()}, softmax:{torch.isnan(F.softmax(z, dim=1)).any()}, log_softmax:{torch.isnan(F.log_softmax(z, dim=1)).any()}")
 
         return loss
     

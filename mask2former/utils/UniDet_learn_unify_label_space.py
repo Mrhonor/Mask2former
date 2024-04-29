@@ -23,6 +23,7 @@ import datetime
 from detectron2.utils.logger import log_every_n_seconds
 from detectron2.data import MetadataCatalog
 import logging
+from ..modeling.transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
 
 @contextmanager
 def inference_context(model):
@@ -57,7 +58,7 @@ def inference_context(model):
 # }
 class UniDetLearnUnifyLabelSpace(HookBase):
     @torch.no_grad()
-    def before_train(self):
+    def After_train(self):
         logger = logging.getLogger(__name__)
         logger.info("UniDetLearnUnifyLabelSpace")
         cfg = self.trainer.cfg
@@ -68,8 +69,8 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         sun_lb = [ "bag", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower curtain", "box", "whiteboard", "person", "night stand", "toilet", "sink", "lamp", "bathtub"]
         bdd_lb = ["road", "sidewalk", "building", "wall", "fence", "pole", "traffic light", "traffic sign", "vegetation", "terrain", "sky", "person", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
         idd_lb = ["road", "drivable fallback or parking", "sidewalk", "non-drivable fallback or rail track", "person or animal", "out of roi or rider", "motorcycle", "bicycle", "autorickshaw", "car", "truck", "bus", "trailer or caravan or vehicle fallback", "curb", "wall", "fence", "guard rail", "billboard", "traffic sign", "traffic light", "polegroup or pole", "obs-str-bar-fallback", "building", "tunnel or bridge", "vegetation", "sky or fallback background"]
-        ade_lb = ["flag", "wall", "building, edifice", "sky", "floor, flooring", "tree", "ceiling", "road, route", "bed ", "windowpane, window ", "grass", "cabinet", "sidewalk, pavement", "person, individual, someone, somebody, mortal, soul", "earth, ground", "door, double door", "table", "mountain, mount", "plant, flora, plant life", "curtain, drape, drapery, mantle, pall", "chair", "car, auto, automobile, machine, motorcar", "water", "painting, picture", "sofa, couch, lounge", "shelf", "house", "sea", "mirror", "rug, carpet, carpeting", "field", "armchair", "seat", "fence, fencing", "desk", "rock, stone", "wardrobe, closet, press", "lamp", "bathtub, bathing tub, bath, tub", "railing, rail", "cushion", "base, pedestal, stand", "box", "column, pillar", "signboard, sign", "chest of drawers, chest, bureau, dresser", "counter", "sand", "sink", "skyscraper", "fireplace, hearth, open fireplace", "refrigerator, icebox", "grandstand, covered stand", "path", "stairs, steps", "runway", "case, display case, showcase, vitrine", "pool table, billiard table, snooker table", "pillow", "screen door, screen", "stairway, staircase", "river", "bridge, span", "bookcase", "blind, screen", "coffee table, cocktail table", "toilet, can, commode, crapper, pot, potty, stool, throne", "flower", "book", "hill", "bench", "countertop", "stove, kitchen stove, range, kitchen range, cooking stove", "palm, palm tree", "kitchen island", "computer, computing machine, computing device, data processor, electronic computer, information processing system", "swivel chair", "boat", "bar", "arcade machine", "hovel, hut, hutch, shack, shanty", "bus, autobus, coach, charabanc, double-decker, jitney, motorbus, motorcoach, omnibus, passenger vehicle", "towel", "light, light source", "truck, motortruck", "tower", "chandelier, pendant, pendent", "awning, sunshade, sunblind", "streetlight, street lamp", "booth, cubicle, stall, kiosk", "television receiver, television, television set, tv, tv set, idiot box, boob tube, telly, goggle box", "airplane, aeroplane, plane", "dirt track", "apparel, wearing apparel, dress, clothes", "pole", "land, ground, soil", "bannister, banister, balustrade, balusters, handrail", "escalator, moving staircase, moving stairway", "ottoman, pouf, pouffe, puff, hassock", "bottle", "buffet, counter, sideboard", "poster, posting, placard, notice, bill, card", "stage", "van", "ship", "fountain", "conveyer belt, conveyor belt, conveyer, conveyor, transporter", "canopy", "washer, automatic washer, washing machine", "plaything, toy", "swimming pool, swimming bath, natatorium", "stool", "barrel, cask", "basket, handbasket", "waterfall, falls", "tent, collapsible shelter", "bag", "minibike, motorbike", "cradle", "oven", "ball", "food, solid food", "step, stair", "tank, storage tank", "trade name, brand name, brand, marque", "microwave, microwave oven", "pot, flowerpot", "animal, animate being, beast, brute, creature, fauna", "bicycle, bike, wheel, cycle ", "lake", "dishwasher, dish washer, dishwashing machine", "screen, silver screen, projection screen", "blanket, cover", "sculpture", "hood, exhaust hood", "sconce", "vase", "traffic light, traffic signal, stoplight", "tray", "ashcan, trash can, garbage can, wastebin, ash bin, ash-bin, ashbin, dustbin, trash barrel, trash bin", "fan", "pier, wharf, wharfage, dock", "crt screen", "plate", "monitor, monitoring device", "bulletin board, notice board", "shower", "radiator", "glass, drinking glass", "clock"]
-        coco_lb = ["rug-merged", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"]
+        ade_lb = ["flag", "wall", "building, edifice", "sky", "floor, flooring", "tree", "ceiling", "road, route", "bed ", "windowpane, window ", "grass", "cabinet", "sidewalk, pavement", "person, individual, someone, somebody, mortal, soul", "earth, ground", "door, double door", "table", "mountain, mount", "plant, flora, plant life", "curtain, drape, drapery, mantle, pall", "chair", "car, auto, automobile, machine, motorcar", "water", "painting, picture", "sofa, couch, lounge", "shelf", "house", "sea", "mirror", "rug, carpet, carpeting", "field", "armchair", "seat", "fence, fencing", "desk", "rock, stone", "wardrobe, closet, press", "lamp", "bathtub, bathing tub, bath, tub", "railing, rail", "cushion", "base, pedestal, stand", "box", "column, pillar", "signboard, sign", "chest of drawers, chest, bureau, dresser", "counter", "sand", "sink", "skyscraper", "fireplace, hearth, open fireplace", "refrigerator, icebox", "grandstand, covered stand", "path", "stairs, steps", "runway", "case, display case, showcase, vitrine", "pool table, billiard table, snooker table", "pillow", "screen door, screen", "stairway, staircase", "river", "bridge, span", "bookcase", "blind, screen", "coffee table, cocktail table", "toilet, can, commode, crapper, pot, potty, stool, throne", "flower", "book", "hill", "bench", "countertop", "stove, kitchen stove, range, kitchen range, cooking stove", "palm, palm tree", "kitchen island", "computer, computing machine, computing device, data processor, electronic computer, information processing system", "swivel chair", "boat", "bar", "arcade machine", "hovel, hut, hutch, shack, shanty", "bus, autobus, coach, charabanc, double-decker, jitney, motorbus, motorcoach, omnibus, passenger vehicle", "towel", "light, light source", "truck, motortruck", "tower", "chandelier, pendant, pendent", "awning, sunshade, sunblind", "streetlight, street lamp", "booth, cubicle, stall, kiosk", "television receiver, television, television set, tv, tv set, idiot box, boob tube, telly, goggle box", "airplane, aeroplane, plane", "dirt track", "apparel, wearing apparel, dress, clothes", "pole", "land, ground, soil", "bannister, banister, balustrade, balusters, handrail", "escalator, moving staircase, moving stairway", "ottoman, pouf, pouffe, puff, hassock", "bottle", "buffet, counter, sideboard", "poster, posting, placard, notice, bill, card", "stage", "van", "ship", "fountain", "conveyer belt, conveyor belt, conveyer, conveyor, transporter", "canopy", "washer, automatic washer, washing machine", "plaything, toy", "swimming pool, swimming bath, natatorium", "stool", "barrel, cask", "basket, handbasket", "waterfall, falls", "tent, collapsible shelter", "bag", "minibike, motorbike", "cradle", "oven", "ball", "food, solid food", "step, stair", "tank, storage tank", "trade name, brand name, brand, marque", "microwave, microwave oven", "pot, flowerpot", "animal, animate being, beast, brute, creature, fauna", "bicycle, bike, wheel, cycle ", "lake", "dishwasher, dish washer, dishwashing machine", "screen, silver screen, projection screen", "blanket, cover", "sculpture", "hood, exhaust hood", "sconce", "vase", "traffic light, traffic signal, stoplight", "tray", "ashcan, trash can, garbage can, wastebin, ash bin, ash-bin, ashbin, dustbin, trash barrel, trash bin", "fan", "pier, wharf, wharfage, dock", "crt screen", "plate", "monitor, monitoring device", "bulletin board, notice board", "shower", "radiator", "glass, drinking glass", "clock", "rug-merged"]
+        coco_lb = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "banner", "blanket", "bridge", "cardboard", "counter", "curtain", "door-stuff", "floor-wood", "flower", "fruit", "gravel", "house", "light", "mirror-stuff", "net", "pillow", "platform", "playingfield", "railroad", "river", "road", "roof", "sand", "sea", "shelf", "snow", "stairs", "tent", "towel", "wall-brick", "wall-stone", "wall-tile", "wall-wood", "water-other", "window-blind", "window-other", "tree-merged", "fence-merged", "ceiling-merged", "sky-other-merged", "cabinet-merged", "table-merged", "floor-other-merged", "pavement-merged", "mountain-merged", "grass-merged", "dirt-merged", "paper-merged", "food-other-merged", "building-other-merged", "rock-merged", "wall-other-merged"]
         wilddash_lb = ['ego vehicle', 'road', 'sidewalk', 'building', 'wall', 'fence', 'guard rail', 'pole', 'traffic light', 'traffic sign', 'vegetation', 'terrain', 'sky', 'person', 'rider', 'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'pickup', 'van', 'billboard', 'street-light', 'road-marking', 'void']
         n_datasets = len(datasets)
         # load meta data
@@ -160,9 +161,14 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                             total_compute_time += time.perf_counter() - start_compute_time
 
                             start_eval_time = time.perf_counter()
+                            # for x in inputs:
+                            #     im = x["image"]
+                            #     if im.shape[-2] > 2200 or im.shape[-1] > 2200:
+                            #         x["image"] = F.interpolate(im[None].float(), size=(int(im.shape[-2]*0.5), int(im.shape[-1]*0.5)), mode='bilinear', align_corners=True).squeeze(0)
+                            #         x["sem_seg"] = F.interpolate(x["sem_seg"].float()[None][None], size=(int(im.shape[-2]*0.5), int(im.shape[-1]*0.5)), mode='nearest').squeeze().long()
                             labels = [x["sem_seg"][None].cuda() for x in inputs]
 
-                            logits = [output["uni_logits"][None] for output in outputs]
+                            logits = [output["uni_logits"] for output in outputs]
                             cnt = 0
                             cur_id = 0
                             for this_dataset_idx, _ in enumerate(datasets_name):
@@ -234,17 +240,51 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             
             return predHist
                         
-        if osp.exists(f"Predhist_{n_datasets}.pickle"):
-            with open(f"Predhist_{n_datasets}.pickle", "rb") as file:
+                
+        def Get_Predhist_by_llm():
+            graph_node_features = gen_graph_node_feature(cfg)
+            def compute_cosine(a_vec, b_vec):
+                # 计算每个向量的范数
+                norms1 = torch.norm(a_vec, dim=1, keepdim=True)
+                norms2 = torch.norm(b_vec, dim=1, keepdim=True)
+                
+                # norm_a = torch.norm(a, dim=1, keepdim=True)
+
+                # 将矩阵a的每行除以其范数，以标准化
+                normalized_a = a_vec / norms1
+
+
+                # 将矩阵b的每行除以其范数，以标准化
+                normalized_b = b_vec / norms2
+
+                # 计算余弦相似度
+                cos_sim = torch.mm(normalized_a, normalized_b.t())
+                
+                return cos_sim
+            
+            predHist = {}
+            for idx, d in enumerate(datasets):
+                this_hist = {}
+                this_emb = graph_node_features[dataset_range[d]]
+                for idx2, d2 in enumerate(datasets):
+                    other_emb = graph_node_features[dataset_range[d2]]
+                    this_hist[d2] = compute_cosine(this_emb.float(), other_emb.float()) * 100
+                predHist[d] = this_hist
+            return predHist
+    
+    
+        if osp.exists(f"Predhist_{n_datasets}_llm_fixbug.pickle"):
+            with open(f"Predhist_{n_datasets}_llm_fixbug.pickle", "rb") as file:
                 Predhist = pickle.load(file)
             # for name, hist in Predhist.items():
             #     del hist[name]
         else:
-
             Predhist = eval_cross_head_and_datasets()
-            with open(f"Predhist_{n_datasets}.pickle", "wb") as file:
+            # Predhist = Get_Predhist_by_llm()
+            with open(f"Predhist_{n_datasets}_llm_fixbug.pickle", "wb") as file:
                 pickle.dump(Predhist, file)
 
+        # logger.info(Predhist)
             # 从文件中加载对象
         # for d in datasets:
         #     newPredDist = {}
@@ -507,9 +547,12 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 ori_mAP = mAPs_all[s][c, ann_ind] 
                 
                 merged_mAP = np.mean([seg_AP(all_preds[s], dataset, ann_ind, id2sourceindex[cc]) for cc, dataset in zip(cats, sources)])
+                # logger.info(f"ann_ind:{ann_ind}, c:{c}, s:{s}, ori_mAP:{ori_mAP}, merged_mAP:{merged_mAP}")
                 # merged_mAP = numba_mAP(merged, all_anns[s][ann_cat])
                 ret += ori_mAP - merged_mAP
-
+            # if ret < 0:
+                
+            #     sdv
             calced_cost[tuple(cats)] = ret
             nemes = [predid2name[c] for c in cats]
             print(*nemes, ret)
@@ -517,11 +560,12 @@ class UniDetLearnUnifyLabelSpace(HookBase):
 
 
         max_new_nodes = {
-            2: 3000, 3: 4000, 4: 4500, 5:4000, 6:1000, 7:500
+            2: 3500, 3: 4000, 4: 3000, 5:1500, 6:1000, 7:500
         }
         n2 = max_new_nodes[2]
+        # tau = 0.2
         tau = 0.2
-        oo = 1000
+        oo = 2000
 
         # Initialize two-node merge
         dataset_dists = {}
@@ -540,6 +584,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 dataset_dists[(d1, d2 + d1 + 1)] = dist
 
         score_thresh = 0.05
+        # score_thresh = -0.02
         Q = []
         nodes = {}
         valid_two_nodes = {}
@@ -558,7 +603,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             Q.append((i, j))
         print('#valid two node merge:', sum(len(v) for k, v in nodes.items()))
         logger.info(f"valid_two_nodes:{valid_two_nodes}")
-
+        # dsasda
         # three-dataset merge
         def remove_duplicate(list1, list2):
             tmp = list1 + list2

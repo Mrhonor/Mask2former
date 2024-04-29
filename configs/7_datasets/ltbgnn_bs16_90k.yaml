@@ -11,12 +11,13 @@ MODEL:
     NFEAT: 4096
     NFEAT_OUT: 2048
     nfeat_adj: 256
-    adj_feat_dim: 128
+    adj_feat_dim: 512
     dropout_rate: 0.5
     threshold_value: 0.95
-    calc_bipartite: False
+    calc_bipartite: True
     output_max_adj: True
     output_softmax_adj: True
+    dataset_embedding: False
     uot_ratio: 1.0
     mse_or_adv: "None"
     GNN_type: "GSAGE"
@@ -26,5 +27,5 @@ MODEL:
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
-    INIT_ADJ_PATH: "output/init_adj_7_datasets_2.pt"
+    INIT_ADJ_PATH: "output/init_adj_7_datasets_294.pt"
     N_POINTS: 1024

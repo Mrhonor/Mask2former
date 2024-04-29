@@ -399,30 +399,62 @@ def build_bipart_for_unseen(cfg, model):
 def main(args):
     cfg = setup(args)
     
-    if args.eval_only:
-        model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=args.resume
-        )
-        # eval_for_mseg_datasets(Trainer.build_test_loader, cfg, model)
-        build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
-        # print_unify_label_space(Trainer.build_test_loader, model, cfg)
-        # return
-        res = Trainer.test(cfg, model)
-        if cfg.TEST.AUG.ENABLED:
-            res.update(Trainer.test_with_TTA(cfg, model))
-        if comm.is_main_process():
-            verify_results(cfg, res)
-        return res
-        # return
+    model = Trainer.build_model(cfg)
+    DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
+        cfg.MODEL.WEIGHTS, resume=args.resume
+    )
+    gnn_model = model.gnn_model
+    gnn_model.set_init_stage(False)
+    unify_prototype, bi_graphs, _, _ = gnn_model(model.graph_node_features)
+    def compute_cosine(a_vec, b_vec):
+        # 计算每个向量的范数
+        norms1 = torch.norm(a_vec, dim=1, keepdim=True)
+        norms2 = torch.norm(b_vec, dim=1, keepdim=True)
+        
+        # norm_a = torch.norm(a, dim=1, keepdim=True)
+
+        # 将矩阵a的每行除以其范数，以标准化
+        normalized_a = a_vec / norms1
+
+
+        # 将矩阵b的每行除以其范数，以标准化
+        normalized_b = b_vec / norms2
+
+        # 计算余弦相似度
+        cos_sim = torch.mm(normalized_a, normalized_b.t())
+        
+        return cos_sim
     
-    trainer = Trainer(cfg)
-    # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
-    # trainer.register_hooks([iter_info_hook()])
-    # trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
-    trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
-    trainer.resume_or_load(resume=args.resume)
-    return trainer.train()
+    sim_matrix = compute_cosine(unify_prototype, unify_prototype)
+    import matplotlib.pyplot as plt
+
+    data = sim_matrix.detach().cpu().numpy()
+    fig, ax = plt.subplots(figsize=(200,200))
+    im = ax.imshow(data)
+
+    # 这里是修改标签
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(unify_prototype)))
+    ax.set_yticks(np.arange(len(unify_prototype)))
+    # ... and label them with the respective list entries
+    # ax.set_xticklabels(unify_prototype)
+    # ax.set_yticklabels(unify_prototype)
+
+    # 因为x轴的标签太长了，需要旋转一下，更加好看
+    # Rotate the tick labels and set their alignment.
+    # plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+    #         rotation_mode="anchor")
+
+    # 添加每个热力块的具体数值
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(unify_prototype)):
+        for j in range(len(unify_prototype)):
+            text = ax.text(j, i, round(data[i, j],2),
+                        ha="center", va="center", color="w")
+    # ax.set_title("Harvest of local farmers (in tons/year)")
+    fig.tight_layout()
+    plt.colorbar(im)
+    plt.savefig("color_map.png", format="PNG")
 
 
 if __name__ == "__main__":

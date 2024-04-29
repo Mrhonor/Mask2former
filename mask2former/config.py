@@ -200,6 +200,7 @@ def add_gnn_config(cfg):
     cfg.MODEL.GNN.FIRST_STAGE_GNN_ITERS = 15000
     cfg.MODEL.GNN.INIT_ADJ_PATH = 'output/init_adj_7_datasets.pt'
     cfg.MODEL.GNN.N_POINTS = 12455
+    cfg.MODEL.GNN.dataset_embedding = False
     
     
     cfg.LOSS.WITH_SPA_LOSS = True

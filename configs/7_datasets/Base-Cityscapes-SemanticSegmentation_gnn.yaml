@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/llama_model_pretrain.pth"
+  WEIGHTS: "output/7ds_llama_pretrain_fixbug.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -19,12 +19,12 @@ DATASETS:
   TEST: ("cs_sem_seg_val", "mapi_sem_seg_train_2", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
   DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
   IGNORE_LB: 255
-  NUM_UNIFY_CLASS: 231
+  NUM_UNIFY_CLASS: 294
   CONFIGER: 'configs/ltbgnn_7_datasets_gpt.json'
 LOSS:
   OHEM_THRESH: 0.7 
   WITH_SPA_LOSS: True
-  WITH_ORTH_LOSS: True
+  WITH_ORTH_LOSS: False
   WITH_ADJ_LOSS: False
 SOLVER:
   IMS_PER_BATCH: 12
@@ -59,7 +59,7 @@ INPUT:
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:
-  EVAL_PERIOD: 20000
+  EVAL_PERIOD: 50000
   AUG:
     ENABLED: False
     MIN_SIZES: [256, 384, 512, 640, 768, 896, 512, 768, 1024, 1280, 1536, 1792]

@@ -89,9 +89,11 @@ def register_sunrgbd():
         stuff_classes=["bag", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower curtain", "box", "whiteboard", "person", "night stand", "toilet", "sink", "lamp", "bathtub"],
         stuff_dataset_id_to_contiguous_id=lb_map,
         thing_dataset_id_to_contiguous_id=lb_map,
+        stuff_colors=[[164, 121, 219],[174, 203, 111],     [ 23,  69, 195],     [233, 198,  64],     [ 10,   7, 111],     [ 38, 181, 228],     [ 75, 211,  41],     [  7, 162,   5],     [ 77, 110,  58],     [ 35, 133,  44],     [163, 186, 153],     [141, 251,  82],     [138,  37,  98],     [177,  96,  58],     [ 83,  69,  70],     [126,  22, 239],     [113,  39, 205],     [224, 216, 151],     [ 54,   3, 109],     [146, 240, 187],     [132, 182, 126],     [112,  78, 139],     [ 19, 228,  89],     [240,  79,  15],     [177, 158, 120],     [ 61, 206, 227],     [230, 101, 208],     [235,  91,  37],     [109,  64,  73],     [ 58,  34,   9],     [178, 109,  61],     [198, 221, 182],     [160, 111,   0],     [109, 155, 209],     [236, 223, 130],     [168,  62, 253],     [ 12,  71,  15]],
         evaluator_type="sem_seg",
         ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
     )
+
 
 
 # _root = os.getenv("DETECTRON2_DATASETS", "datasets")
@@ -135,11 +137,12 @@ def register_sunrgbd_train():
         DatasetCatalog.register(
             name, lambda x=annpath : sunrgbd_train(x)
         )
-        
+            
         MetadataCatalog.get(name).set(
             stuff_classes=["bag", "wall", "floor", "cabinet", "bed", "chair", "sofa", "table", "door", "window", "bookshelf", "picture", "counter", "blinds", "desk", "shelves", "curtain", "dresser", "pillow", "mirror", "floor mat", "clothes", "ceiling", "books", "refridgerator", "television", "paper", "towel", "shower curtain", "box", "whiteboard", "person", "night stand", "toilet", "sink", "lamp", "bathtub"],
             stuff_dataset_id_to_contiguous_id=lb_map,
             thing_dataset_id_to_contiguous_id=lb_map,
+            stuff_colors=[[164, 121, 219],[174, 203, 111],     [ 23,  69, 195],     [233, 198,  64],     [ 10,   7, 111],     [ 38, 181, 228],     [ 75, 211,  41],     [  7, 162,   5],     [ 77, 110,  58],     [ 35, 133,  44],     [163, 186, 153],     [141, 251,  82],     [138,  37,  98],     [177,  96,  58],     [ 83,  69,  70],     [126,  22, 239],     [113,  39, 205],     [224, 216, 151],     [ 54,   3, 109],     [146, 240, 187],     [132, 182, 126],     [112,  78, 139],     [ 19, 228,  89],     [240,  79,  15],     [177, 158, 120],     [ 61, 206, 227],     [230, 101, 208],     [235,  91,  37],     [109,  64,  73],     [ 58,  34,   9],     [178, 109,  61],     [198, 221, 182],     [160, 111,   0],     [109, 155, 209],     [236, 223, 130],     [168,  62, 253],     [ 12,  71,  15]],
             evaluator_type="sem_seg",
             ignore_label=255,  # NOTE: gt is saved in 16-bit TIFF images
         )

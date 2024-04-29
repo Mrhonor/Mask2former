@@ -162,8 +162,9 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         else:
             if "dataset_id" in batched_inputs[0]: 
                 dataset_lbs = int(batched_inputs[0]["dataset_id"])
-            # else:
-            # dataset_lbs = dataset
+            else:
+                dataset_lbs = dataset
+            # dataset_lbs = 6
 
 
         
@@ -200,9 +201,9 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             for logit, input_per_image, image_size, uni_logits in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
-                # logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                # logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                logit = F.interpolate(logit, size=(height, width), mode="bilinear", align_corners=True)[0]
+                logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
+                # logit = F.interpolate(logit, size=(height, width), mode="bilinear", align_corners=True)[0]
                 # uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                 # uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
                 # uni_logits = F.interpolate(uni_logits, size=(height, width), mode="bilinear", align_corners=True)[0]

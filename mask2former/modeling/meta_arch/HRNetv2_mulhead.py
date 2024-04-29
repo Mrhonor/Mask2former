@@ -10,7 +10,6 @@ from ...utils.configer import Configer
 from timm.models.layers import trunc_normal_
 import clip
 import logging
-from ..transformer_decoder.GNN.gen_graph_node_feature import gen_graph_node_feature
 
 # backbone_url = './res/hrnetv2_w48_imagenet_pretrained.pth'
 logger = logging.getLogger(__name__)
@@ -61,20 +60,6 @@ def BNReLU(num_features, bn_type=None, **kwargs):
     else:
         Log.error('Not support BN type: {}.'.format(bn_type))
         exit(1)
-
-class MLP(nn.Module):
-    """ Very simple multi-layer perceptron (also called FFN)"""
-
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super().__init__()
-        self.num_layers = 1 + len(hidden_dim)
-
-        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + hidden_dim, hidden_dim + [output_dim]))
-
-    def forward(self, x):
-        for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
-        return x
 
 
 class ProjectionHead(nn.Module):
@@ -128,7 +113,7 @@ class ProjectionHead(nn.Module):
         return feat
 
 @SEM_SEG_HEADS_REGISTRY.register()
-class HRNet_W48_llama(nn.Module):
+class HRNet_W48_mulhead(nn.Module):
     """
     deep high-resolution representation learning for human pose estimation, CVPR2019
     """
@@ -141,10 +126,8 @@ class HRNet_W48_llama(nn.Module):
                 with_datasets_aux,
                 bn_type,
                 input_shape,
-                Pretraining,
-                text_feature_vecs,
                 configer):
-        super(HRNet_W48_llama, self).__init__()
+        super(HRNet_W48_mulhead, self).__init__()
         self.aux_mode = aux_mode
         # self.num_unify_classes = num_unify_classes')
         self.datasets_cats = datasets_cats
@@ -152,12 +135,11 @@ class HRNet_W48_llama(nn.Module):
         # self.backbone = backbone
         self.output_feat_dim = output_feat_dim
         self.configer = configer
-        self.Pretraining = Pretraining
+
         # extra added layers
         in_channels = input_shape  # 48 + 96 + 192 + 384
 
         self.proj_head = ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
-        
 
         self.total_cats = 0
         # self.datasets_cats = []
@@ -179,7 +161,9 @@ class HRNet_W48_llama(nn.Module):
                 ))
             
 
-
+        self.unify_prototype = nn.ParameterList([nn.Parameter(torch.zeros(n_cat, self.output_feat_dim),
+                                requires_grad=True) for n_cat in self.datasets_cats])
+        _= [trunc_normal_(proto, std=0.02) for proto in self.unify_prototype]
         
         self.with_datasets_aux = with_datasets_aux
         if self.with_datasets_aux:
@@ -190,17 +174,8 @@ class HRNet_W48_llama(nn.Module):
                 trunc_normal_(self.aux_prototype[i], std=0.02)
 
         self.init_weights()    
-        if self.Pretraining:
-            self.mlp = MLP(4096, [], self.output_feat_dim)
-            self.llama_prototype = nn.Parameter(torch.zeros(num_unify_class, 4096),
-                        requires_grad=False)
-            self.llama_prototype.data = text_feature_vecs
-            # trunc_normal_(self.unify_prototype, std=0.02)
-            # self.get_encode_lb_vec()
-        else:
-            self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
-                        requires_grad=True)
-            trunc_normal_(self.unify_prototype, std=0.02)
+        # if self.num_unify_class == self.total_cats:
+        #     self.get_encode_lb_vec()
         
 
     @classmethod
@@ -211,10 +186,8 @@ class HRNet_W48_llama(nn.Module):
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         output_feat_dim = cfg.MODEL.SEM_SEG_HEAD.OUTPUT_FEAT_DIM
         with_datasets_aux = cfg.MODEL.GNN.with_datasets_aux
-        Pretraining = cfg.MODEL.PRETRAINING
         bn_type = cfg.MODEL.SEM_SEG_HEAD.BN_TYPE
         configer = Configer(configs=cfg.DATASETS.CONFIGER)
-        text_feature_vecs = gen_graph_node_feature(cfg)
         return {
             # 'backbone': backbone,
             'aux_mode': aux_mode,
@@ -224,8 +197,6 @@ class HRNet_W48_llama(nn.Module):
             'bn_type': bn_type,
             'input_shape': input_shape,
             'num_unify_class': num_unify_class,
-            "Pretraining": Pretraining,
-            'text_feature_vecs': text_feature_vecs,
             'configer': configer,
         }
 
@@ -242,109 +213,25 @@ class HRNet_W48_llama(nn.Module):
 
         feats = torch.cat([feat1, feat2, feat3, feat4], 1)
         emb = self.proj_head(feats)
-        if self.Pretraining:
-            unify_prototype = self.mlp(self.llama_prototype.to(emb.dtype))
-        else:
-            unify_prototype = self.unify_prototype
-
+        remap_logits = []
         if self.training:
-            logits = torch.einsum('bchw, nc -> bnhw', emb, unify_prototype.to(emb.dtype))
-            remap_logits = []
             for i in range(self.n_datasets):
                 if not (dataset_ids == i).any():
                     continue
-                remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
-            
-            if self.with_datasets_aux:
-                cur_cat = 0
-                aux_logits = []
-                for i in range(self.n_datasets):
-                    aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb[dataset_ids==i], self.aux_prototype[i].to(emb.dtype)))
-                    cur_cat += self.datasets_cats[i]
-                    
-                return {'logits':remap_logits, 'aux_logits':aux_logits, 'emb':emb}
-            
-            return {'logits':remap_logits, 'emb':emb}
+                logits = torch.einsum('bchw, nc -> bnhw', emb[dataset_ids == i], self.unify_prototype[i])
+                remap_logits.append(logits)
         else:
-            # logger.info(f'emb : dtype{emb.dtype}, unify_prototype : dtype{self.unify_prototype.dtype}')
-            
-            logits = torch.einsum('bchw, nc -> bnhw', emb, unify_prototype.to(emb.dtype)) 
             if not isinstance(dataset_ids, int):
-                remap_logits = []
                 for i in range(self.n_datasets):
                     if not (dataset_ids == i).any():
                         continue
-                    remap_logits.append(torch.einsum('bchw, nc -> bnhw', logits[dataset_ids==i], self.bipartite_graphs[i]))
+                logits = torch.einsum('bchw, nc -> bnhw', emb[dataset_ids == i], self.unify_prototype[i])
+                remap_logits.append(logits)
             else:
-                remap_logits = [torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset_ids])]
+                logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[dataset_ids])
+                remap_logits.append(logits)
                 
-            return {'logits':remap_logits, 'emb':emb, 'uni_logits':logits[None]}
-
-    # return {'logits': emb}
-
-        # if self.aux_mode == 'train':
-        #     # if self.training:
-        #     #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-                
-        #     #     if self.with_datasets_aux:
-        #     #         cur_cat = 0
-        #     #         aux_logits = []
-        #     #         for i in range(self.n_datasets):
-        #     #             aux_logits.append(torch.einsum('bchw, nc -> bnhw', emb, self.aux_prototype[i]))
-        #     #             cur_cat += self.datasets_cats[i]
-                        
-        #     #         return {'seg':logits, 'aux':aux_logits}
-                
-        #     #     return {'seg':logits}
-        #     # else:
-        #     return {'seg':emb}
-        # elif self.aux_mode == 'eval':
-
-        #     # cur_cat=0
-        #     # for i in range(0, dataset):
-        #     #     cur_cat += self.datasets_cats[i]
-            
-        #     # logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[cur_cat:cur_cat+self.datasets_cats[dataset]])   
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # return logits
-        #     remap_logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     return remap_logits
-        # elif self.aux_mode == 'pred':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset][:self.datasets_cats[dataset]-1])
-        #     logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     logits = F.interpolate(logits, size=(logits.size(2)*4, logits.size(3)*4), mode="bilinear", align_corners=True)
-            
-        #     pred = logits.argmax(dim=1)
-            
-        #     return pred
-        # elif self.aux_mode == 'clip':
-        #     cur_cat=0
-        #     for i in range(0, dataset):
-        #         cur_cat += self.datasets_cats[i]
-            
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[cur_cat:cur_cat+self.datasets_cats[dataset]])   
-        #     return logits
-        # elif self.aux_mode == 'uni_eval':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     return logits
-        # elif self.aux_mode == 'unseen':
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-
-        #     max_index = torch.argmax(logits, dim=1)
-        #     temp = torch.eye(logits.size(1)).cuda()
-        #     one_hot = temp[max_index]
-        #     remap_logits = torch.einsum('bhwc, nc -> bnhw', one_hot, self.bipartite_graphs[dataset])
-        #     return remap_logits
-            
-        # else:
-        #     logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype)
-        #     # logits = torch.einsum('bchw, nc -> bnhw', logits, self.bipartite_graphs[dataset])
-        #     logits = F.interpolate(logits, size=(logits.size(2)*4, logits.size(3)*4), mode="bilinear", align_corners=True)
-            
-        #     pred = logits.argmax(dim=1)
-            
-        #     return pred
+        return {'logits':remap_logits, 'uni_logits':remap_logits}
 
     def req_grad(self, isFrooze):
         for name, param in self.named_parameters():
@@ -449,7 +336,6 @@ class HRNet_W48_llama(nn.Module):
                 text_feature_vecs.append(text_features)
                 
         text_feature_vecs = torch.cat(text_feature_vecs, dim=0)
-        print(f"text_feature shape:{text_feature_vecs.shape}")
         self.unify_prototype.data = text_feature_vecs
         self.unify_prototype.requires_grad=False
                 

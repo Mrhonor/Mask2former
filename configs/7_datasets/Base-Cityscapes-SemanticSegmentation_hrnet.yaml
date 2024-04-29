@@ -2,7 +2,7 @@ MODEL:
   BACKBONE:
     FREEZE_AT: 0
     NAME: "HighResolutionNet"
-  WEIGHTS: "output/model_final_4GPU.pth"
+  WEIGHTS: "output/hrnetv2_w48_imagenet_pretrained_2.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   HRNET:
@@ -10,13 +10,13 @@ MODEL:
     KEEP_IMAGENET_HEAD: False  # not used
     DROP_STAGE4: False
     FULL_RES_STEM: False
-    BN_TYPE: "torchbn"  # use syncbn for cityscapes dataset
+    BN_TYPE: "torchsyncbn"  # use syncbn for cityscapes dataset
   AUX_MODE: "train"
   PRETRAINING: True
 DATASETS:
   TRAIN: ("cs_sem_seg_train", "mapi_sem_seg_train", "sunrgbd_sem_seg_train", "bdd_sem_seg_train", "idd_sem_seg_train", "ade_sem_seg_train", "coco_sem_seg_train")
   EVAL: ("cs_sem_seg_train_2", "mapi_sem_seg_train_2", "sunrgbd_sem_seg_train_2", "bdd_sem_seg_train_2", "idd_sem_seg_train_2", "ade_sem_seg_train_2", "coco_sem_seg_train_2")
-  TEST: ("cs_sem_seg_val", "mapi_sem_seg_train_2", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
+  TEST: ("cs_sem_seg_val", "mapi_sem_seg_val", "sunrgbd_sem_seg_val", "bdd_sem_seg_val", "idd_sem_seg_val", "ade_sem_seg_val", "coco_sem_seg_val")
   DATASETS_CATS: [19, 64, 37, 19, 26, 150, 133]
   IGNORE_LB: 255
   NUM_UNIFY_CLASS: 448
@@ -27,9 +27,9 @@ LOSS:
   WITH_ORTH_LOSS: True
   WITH_ADJ_LOSS: False
 SOLVER:
-  IMS_PER_BATCH: 2
+  IMS_PER_BATCH: 12
   BASE_LR: 0.0001
-  MAX_ITER: 30000
+  MAX_ITER: 150000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 1000
   WEIGHT_DECAY: 0.05
@@ -59,7 +59,7 @@ INPUT:
   FORMAT: "RGB"
   DATASET_MAPPER_NAME: "DALI"
 TEST:
-  EVAL_PERIOD: 10000
+  EVAL_PERIOD: 50000
   AUG:
     ENABLED: False
     MIN_SIZES: [256, 384, 512, 640, 768, 896, 512, 768, 1024, 1280, 1536, 1792]
