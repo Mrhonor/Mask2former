@@ -1,0 +1,388 @@
+road____road_road_road, 0, , , , 0, 7, 100
+sidewalk___sidewalk_sidewalk_sidewalk_, 1, , , 1, 2, 12, 
+building___building_building_building_, 2, , , 2, 22, 2, 
+wall_Wall__wall_wall_wall_, 3, 6, , 3, 14, 1, 
+fence_Fence__fence_fence_fence_, 4, 3, , 4, 15, 33, 
+pole___pole_polegroup or pole__, 5, , , 5, 20, , 
+traffic light_Traffic Light__traffic light_traffic light_traffic light_traffic light, 6, 47, , 6, 19, 137, 9
+traffic sign___traffic sign_traffic sign__, 7, , , 7, 18, , 
+vegetation_Vegetation__vegetation_vegetation__, 8, 30, , 8, 24, , 
+terrain______, 9, , , , , , 
+sky_____sky_, 10, , , , , 3, 
+person_____person_, 11, , , , , 13, 
+rider______, 12, , , , , , 
+car_Car__car_car_car_, 13, 54, , 13, 9, 21, 
+truck_Truck__truck_truck__truck, 14, 60, , 14, 10, , 7
+bus_Bus__bus_bus_bus_, 15, 53, , 15, 11, 81, 
+train______bus, 16, , , , , , 5
+motorcycle_Motorcycle__motorcycle_motorcycle__, 17, 56, , 17, 6, , 
+bicycle_Bicycle__bicycle_bicycle_bicycle_, 18, 51, , 18, 7, 128, 
+_Bird_____, , 0, , , , , 
+_Ground Animal_____, , 1, , , , , 
+_Curb___curb__, , 2, , , 13, , 
+_Guard Rail_____, , 4, , , , , 
+_Barrier_____, , 5, , , , , 
+_Bike Lane_____, , 7, , , , , 
+_Crosswalk - Plain_____, , 8, , , , , 
+_Curb Cut_____, , 9, , , , , 
+_Parking_____, , 10, , , , , 
+_Pedestrian Area_____, , 11, , , , , 
+_Rail Track_____, , 12, , , , , 
+_Road_____, , 13, , , , , 
+_Service Lane_____, , 14, , , , , 
+_Sidewalk_____, , 15, , , , , 
+_Bridge_____, , 16, , , , , 
+_Building_____, , 17, , , , , 
+_Tunnel_____, , 18, , , , , 
+_Person_____, , 19, , , , , 
+_Bicyclist_____, , 20, , , , , 
+_Motorcyclist_____, , 21, , , , , 
+_Other Rider_____, , 22, , , , , 
+_Lane Marking - Crosswalk_____, , 23, , , , , 
+_Mountain_____, , 25, , , , , 
+_Sand_____, , 26, , , , , 
+_Sky__sky___, , 27, , 10, , , 
+_Snow_____, , 28, , , , , 
+_Terrain__terrain___, , 29, , 9, , , 
+_Water_____, , 31, , , , , 
+_Banner_____, , 32, , , , , 
+_Bench_____, , 33, , , , , 
+_Bike Rack_____, , 34, , , , , 
+_Billboard_____, , 35, , , , , 
+_Catch Basin_____, , 36, , , , , 
+_CCTV Camera_____, , 37, , , , , 
+_Fire Hydrant_____, , 38, , , , , 
+_Junction Box_____, , 39, , , , , 
+_Manhole_____, , 40, , , , , 
+_Phone Booth_____, , 41, , , , , 
+_Pothole_____, , 42, , , , , 
+_Street Light_____, , 43, , , , , 
+_Pole_____, , 44, , , , , 
+_Traffic Sign Frame_____, , 45, , , , , 
+_Utility Pole_____, , 46, , , , , 
+_Trash Can_____, , 50, , , , , 
+_Boat_____, , 52, , , , , 
+_Caravan_____, , 55, , , , , 
+_On Rails_____, , 57, , , , , 
+_Trailer_____, , 59, , , , , 
+_Wheeled Slow_____, , 61, , , , , 
+_Car Mount_____, , 62, , , , , 
+_Ego Vehicle_____, , 63, , , , , 
+__bag____, , , 0, , , , 
+__wall____, , , 1, , , , 
+__floor____, , , 2, , , , 
+__cabinet____, , , 3, , , , 
+__bed____, , , 4, , , , 
+__chair____, , , 5, , , , 
+__sofa____, , , 6, , , , 
+__table____, , , 7, , , , 
+__door____, , , 8, , , , 
+__window____, , , 9, , , , 
+__bookshelf____, , , 10, , , , 
+__picture____, , , 11, , , , 
+__counter____, , , 12, , , , 
+__blinds____, , , 13, , , , 
+__desk____, , , 14, , , , 
+__curtain____, , , 16, , , , 
+__dresser____, , , 17, , , , 
+__pillow____, , , 18, , , , 
+__mirror____, , , 19, , , , 
+__floor mat____, , , 20, , , , 
+__clothes____, , , 21, , , , 
+__ceiling____, , , 22, , , , 
+__books____, , , 23, , , , 
+__refridgerator___refrigerator_, , , 24, , , 51, 
+__television____, , , 25, , , , 
+__paper____, , , 26, , , , 
+__towel____, , , 27, , , , 
+__shower curtain____, , , 28, , , , 
+__box____, , , 29, , , , 
+__whiteboard____, , , 30, , , , 
+__person____, , , 31, , , , 
+__night stand____, , , 32, , , , 
+__toilet____, , , 33, , , , 
+__sink___sink_, , , 34, , , 48, 
+__lamp___lamp_, , , 35, , , 37, 
+__bathtub____, , , 36, , , , 
+___road___, , , , 0, , , 
+___person___, , , , 11, , , 
+___rider___, , , , 12, , , 
+____drivable fallback or parking__, , , , , 1, , 
+____non-drivable fallback or rail track__, , , , , 3, , 
+____person or animal__, , , , , 4, , 
+____out of roi or rider__, , , , , 5, , 
+____autorickshaw__, , , , , 8, , 
+____trailer or caravan or vehicle fallback__, , , , , 12, , 
+____guard rail__, , , , , 16, , 
+____billboard__, , , , , 17, , 
+____obs-str-bar-fallback__, , , , , 21, , 
+____tunnel or bridge__, , , , , 23, , 
+____sky or fallback background__, , , , , 25, , 
+_____flag_, , , , , , 0, 
+_____floor_, , , , , , 4, 
+_____tree_, , , , , , 5, 
+_____ceiling_, , , , , , 6, 
+_____bed _bed, , , , , , 8, 59
+_____windowpane_, , , , , , 9, 
+_____grass_, , , , , , 10, 
+_____cabinet_, , , , , , 11, 
+_____earth_, , , , , , 14, 
+_____door_, , , , , , 15, 
+_____table_, , , , , , 16, 
+_____mountain_, , , , , , 17, 
+_____plant_, , , , , , 18, 
+_____curtain_, , , , , , 19, 
+_____chair_, , , , , , 20, 
+_____water_, , , , , , 22, 
+_____painting_, , , , , , 23, 
+_____sofa_, , , , , , 24, 
+_____shelf_, , , , , , 25, 
+_____house_, , , , , , 26, 
+_____sea_, , , , , , 27, 
+_____mirror_, , , , , , 28, 
+_____rug_, , , , , , 29, 
+_____field_, , , , , , 30, 
+_____armchair_, , , , , , 31, 
+_____seat_chair, , , , , , 32, 56
+_____desk_, , , , , , 34, 
+_____rock_, , , , , , 35, 
+_____wardrobe_, , , , , , 36, 
+_____bathtub_, , , , , , 38, 
+_____railing_, , , , , , 39, 
+_____cushion_, , , , , , 40, 
+_____base_, , , , , , 41, 
+_____box_, , , , , , 42, 
+_____column_, , , , , , 43, 
+_____signboard_, , , , , , 44, 
+_____chest of drawers_, , , , , , 45, 
+_____counter_, , , , , , 46, 
+_____sand_gravel, , , , , , 47, 90
+_____skyscraper_, , , , , , 49, 
+_____fireplace_, , , , , , 50, 
+_____grandstand_, , , , , , 52, 
+_____path_, , , , , , 53, 
+_____stairs_, , , , , , 54, 
+_____runway_, , , , , , 55, 
+_____case_, , , , , , 56, 
+_____pool table_, , , , , , 57, 
+_____screen door_, , , , , , 59, 
+_____river_, , , , , , 61, 
+_____bridge_, , , , , , 62, 
+_____blind_, , , , , , 64, 
+_____coffee table_, , , , , , 65, 
+_____toilet_, , , , , , 66, 
+_____flower_, , , , , , 67, 
+_____book_, , , , , , 68, 
+_____bench_, , , , , , 70, 
+_____countertop_, , , , , , 71, 
+_____stove_, , , , , , 72, 
+_____palm_, , , , , , 73, 
+_____kitchen island_, , , , , , 74, 
+_____computer_, , , , , , 75, 
+_____swivel chair_, , , , , , 76, 
+_____boat_, , , , , , 77, 
+_____bar_, , , , , , 78, 
+_____arcade machine_, , , , , , 79, 
+_____hovel_, , , , , , 80, 
+_____towel_, , , , , , 82, 
+_____light_, , , , , , 83, 
+_____truck_, , , , , , 84, 
+_____tower_, , , , , , 85, 
+_____chandelier_, , , , , , 86, 
+_____awning_, , , , , , 87, 
+_____streetlight_, , , , , , 88, 
+_____booth_, , , , , , 89, 
+_____television receiver_, , , , , , 90, 
+_____airplane_, , , , , , 91, 
+_____dirt track_, , , , , , 92, 
+_____apparel_, , , , , , 93, 
+_____pole_, , , , , , 94, 
+_____land_, , , , , , 95, 
+_____escalator_, , , , , , 97, 
+_____ottoman_, , , , , , 98, 
+_____bottle_, , , , , , 99, 
+_____buffet_, , , , , , 100, 
+_____poster_, , , , , , 101, 
+_____stage_, , , , , , 102, 
+_____van_, , , , , , 103, 
+_____fountain_, , , , , , 105, 
+_____conveyer belt_, , , , , , 106, 
+_____canopy_, , , , , , 107, 
+_____washer_, , , , , , 108, 
+_____plaything_, , , , , , 109, 
+_____swimming pool_, , , , , , 110, 
+_____stool_, , , , , , 111, 
+_____barrel_, , , , , , 112, 
+_____basket_, , , , , , 113, 
+_____waterfall_, , , , , , 114, 
+_____tent_, , , , , , 115, 
+_____bag_, , , , , , 116, 
+_____minibike_, , , , , , 117, 
+_____cradle_, , , , , , 118, 
+_____ball_, , , , , , 120, 
+_____food_, , , , , , 121, 
+_____tank_, , , , , , 123, 
+_____trade name_, , , , , , 124, 
+_____microwave_, , , , , , 125, 
+_____pot_, , , , , , 126, 
+_____animal_, , , , , , 127, 
+_____lake_, , , , , , 129, 
+_____dishwasher_, , , , , , 130, 
+_____screen_, , , , , , 131, 
+_____blanket_, , , , , , 132, 
+_____sculpture_, , , , , , 133, 
+_____hood_, , , , , , 134, 
+_____sconce_, , , , , , 135, 
+_____vase_, , , , , , 136, 
+_____tray_, , , , , , 138, 
+_____ashcan_, , , , , , 139, 
+_____fan_, , , , , , 140, 
+_____pier_, , , , , , 141, 
+_____crt screen_, , , , , , 142, 
+_____plate_, , , , , , 143, 
+_____bulletin board_, , , , , , 145, 
+_____shower_, , , , , , 146, 
+_____radiator_, , , , , , 147, 
+_____glass_, , , , , , 148, 
+_____clock_, , , , , , 149, 
+______person, , , , , , , 0
+______bicycle, , , , , , , 1
+______car, , , , , , , 2
+______motorcycle, , , , , , , 3
+______airplane, , , , , , , 4
+______boat, , , , , , , 8
+______fire hydrant, , , , , , , 10
+______stop sign, , , , , , , 11
+______parking meter, , , , , , , 12
+______bench, , , , , , , 13
+______bird, , , , , , , 14
+______cat, , , , , , , 15
+______dog, , , , , , , 16
+______horse, , , , , , , 17
+______sheep, , , , , , , 18
+______cow, , , , , , , 19
+______elephant, , , , , , , 20
+______bear, , , , , , , 21
+______zebra, , , , , , , 22
+______giraffe, , , , , , , 23
+______backpack, , , , , , , 24
+______umbrella, , , , , , , 25
+______handbag, , , , , , , 26
+______tie, , , , , , , 27
+______suitcase, , , , , , , 28
+______frisbee, , , , , , , 29
+______skis, , , , , , , 30
+______sports ball, , , , , , , 32
+______kite, , , , , , , 33
+______baseball bat, , , , , , , 34
+______baseball glove, , , , , , , 35
+______surfboard, , , , , , , 37
+______tennis racket, , , , , , , 38
+______bottle, , , , , , , 39
+______wine glass, , , , , , , 40
+______fork, , , , , , , 42
+______banana, , , , , , , 46
+______sandwich, , , , , , , 48
+______broccoli, , , , , , , 50
+______carrot, , , , , , , 51
+______hot dog, , , , , , , 52
+______pizza, , , , , , , 53
+______donut, , , , , , , 54
+______cake, , , , , , , 55
+______couch, , , , , , , 57
+______potted plant, , , , , , , 58
+______toilet, , , , , , , 61
+______tv, , , , , , , 62
+______laptop, , , , , , , 63
+______mouse, , , , , , , 64
+______remote, , , , , , , 65
+______cell phone, , , , , , , 67
+______microwave, , , , , , , 68
+______oven, , , , , , , 69
+______toaster, , , , , , , 70
+______refrigerator, , , , , , , 72
+______book, , , , , , , 73
+______clock, , , , , , , 74
+______vase, , , , , , , 75
+______scissors, , , , , , , 76
+______teddy bear, , , , , , , 77
+______hair drier, , , , , , , 78
+______toothbrush, , , , , , , 79
+______banner, , , , , , , 80
+______blanket, , , , , , , 81
+______bridge, , , , , , , 82
+______cardboard, , , , , , , 83
+______counter, , , , , , , 84
+______curtain, , , , , , , 85
+______door-stuff, , , , , , , 86
+______floor-wood, , , , , , , 87
+______flower, , , , , , , 88
+______fruit, , , , , , , 89
+______house, , , , , , , 91
+______light, , , , , , , 92
+______mirror-stuff, , , , , , , 93
+______net, , , , , , , 94
+______pillow, , , , , , , 95
+______platform, , , , , , , 96
+______playingfield, , , , , , , 97
+______river, , , , , , , 99
+______roof, , , , , , , 101
+______sea, , , , , , , 103
+______snow, , , , , , , 105
+______stairs, , , , , , , 106
+______tent, , , , , , , 107
+______towel, , , , , , , 108
+______wall-brick, , , , , , , 109
+______wall-tile, , , , , , , 111
+______water-other, , , , , , , 113
+______window-blind, , , , , , , 114
+______window-other, , , , , , , 115
+______tree-merged, , , , , , , 116
+______sky-other-merged, , , , , , , 119
+______pavement-merged, , , , , , , 123
+______mountain-merged, , , , , , , 124
+______food-other-merged, , , , , , , 128
+_Lane Marking - General_____, , 24, , , , , 
+_Traffic Sign (Back)_____, , 48, , , , , 
+_Traffic Sign (Front)_____, , 49, , , , , 
+_Other Vehicle_____, , 58, , , , , 
+__shelves____, , , 15, , , , 
+___train___, , , , 16, , , 
+_____pillow_, , , , , , 58, 
+_____stairway_, , , , , , 60, 
+_____bookcase_, , , , , , 63, 
+_____hill_, , , , , , 69, 
+_____bannister_, , , , , , 96, 
+_____ship_, , , , , , 104, 
+_____oven_, , , , , , 119, 
+_____step_, , , , , , 122, 
+_____monitor_, , , , , , 144, 
+______train, , , , , , , 6
+______snowboard, , , , , , , 31
+______skateboard, , , , , , , 36
+______cup, , , , , , , 41
+______knife, , , , , , , 43
+______spoon, , , , , , , 44
+______bowl, , , , , , , 45
+______apple, , , , , , , 47
+______orange, , , , , , , 49
+______dining table, , , , , , , 60
+______keyboard, , , , , , , 66
+______sink, , , , , , , 71
+______railroad, , , , , , , 98
+______sand, , , , , , , 102
+______shelf, , , , , , , 104
+______wall-stone, , , , , , , 110
+______wall-wood, , , , , , , 112
+______fence-merged, , , , , , , 117
+______ceiling-merged, , , , , , , 118
+______cabinet-merged, , , , , , , 120
+______table-merged, , , , , , , 121
+______floor-other-merged, , , , , , , 122
+______grass-merged, , , , , , , 125
+______dirt-merged, , , , , , , 126
+______paper-merged, , , , , , , 127
+______building-other-merged, , , , , , , 129
+______rock-merged, , , , , , , 130
+______wall-other-merged, , , , , , , 131
+______rug-merged, , , , , , , 132

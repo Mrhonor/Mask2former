@@ -65,7 +65,8 @@ from mask2former import (
     LoaderAdapter,
     build_bipartite_graph_for_unseen,
     eval_for_mseg_datasets,
-    UniDetLearnUnifyLabelSpace
+    UniDetLearnUnifyLabelSpace,
+    create_uni_label_space_by_text
 )
 
 from PIL import Image
@@ -398,7 +399,8 @@ def build_bipart_for_unseen(cfg, model):
 
 def main(args):
     cfg = setup(args)
-    
+    create_uni_label_space_by_text(cfg)
+    eea
     model = Trainer.build_model(cfg)
     DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
         cfg.MODEL.WEIGHTS, resume=args.resume

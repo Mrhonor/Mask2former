@@ -14,7 +14,7 @@ MODEL:
     adj_feat_dim: 512
     dropout_rate: 0.5
     threshold_value: 0.95
-    calc_bipartite: True
+    calc_bipartite: False
     output_max_adj: True
     output_softmax_adj: True
     dataset_embedding: False
@@ -27,5 +27,5 @@ MODEL:
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
-    INIT_ADJ_PATH: "output/init_adj_7_datasets_294.pt"
+    INIT_ADJ_PATH: "output/init_adj_7_datasets_249.pt"
     N_POINTS: 1024

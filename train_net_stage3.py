@@ -405,7 +405,8 @@ def main(args):
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
         # eval_for_mseg_datasets(Trainer.build_test_loader, cfg, model)
-        # build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
+        if args.unseen:
+            build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
         # print_unify_label_space(Trainer.build_test_loader, model, cfg)
         # return
         res = Trainer.test(cfg, model)
@@ -417,16 +418,22 @@ def main(args):
         # return
     
     trainer = Trainer(cfg)
-    # trainer.register_hooks([eval_link_hook(), iter_info_hook()])
-    # trainer.register_hooks([iter_info_hook()])
     trainer.register_hooks([find_unuse_hook(), iter_info_hook()])
-    # trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 
+def argument_parser():
+    parser = default_argument_parser()
+    parser.add_argument(
+        "--unseen",
+        action="store_true",
+        help="Whether to evaluate unseen datasets. ",
+    )
+    return parser
+
 
 if __name__ == "__main__":
-    args = default_argument_parser().parse_args()
+    args = argument_parser().parse_args()
     print("Command Line Args:", args)
     launch(
         main,

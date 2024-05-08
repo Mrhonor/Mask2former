@@ -28,6 +28,7 @@ from .HRNetv2_model_WOGNN import HRNet_W48_WOGNN_ARCH
 from .HRNetv2_model_finetune_unseen import HRNet_W48_Finetune_Unseen_ARCH
 from .HRNetv2_model_finetune_vis import HRNet_W48_Finetune_Vis_ARCH
 from .HRNetv2_model_mseg_eval import HRNet_W48_Mseg_ARCH
+from .HRNetv2_model_naive_concat import HRNet_W48_Naive_Concat_ARCH
 from .test_time_augmentation import SemanticSegmentorWithTTA
 
 # evaluation
@@ -38,3 +39,4 @@ from .utils.UniDet_learn_unify_label_space import UniDetLearnUnifyLabelSpace
 from .utils.build_bipartite_graph_for_unseen import build_bipartite_graph_for_unseen, build_bipartite_graph_for_unseen_for_manually
 from .utils.save_result import save_result
 from .utils.find_specific_class import find_specific_class
+from .utils.create_uni_label_space_by_text import create_uni_label_space_by_text

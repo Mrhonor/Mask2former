@@ -12,21 +12,12 @@ Please see [Getting Started with Detectron2](https://github.com/facebookresearch
   for example, `configs/coco/panoptic-segmentation/maskformer2_R50_bs16_50ep.yaml`.
 2. We provide `demo.py` that is able to demo builtin configs. Run it with:
 ```
-cd demo/
-python demo.py --config-file ../configs/coco/panoptic-segmentation/maskformer2_R50_bs16_50ep.yaml \
-  --input input1.jpg input2.jpg \
-  [--other-options]
+python demo/demo.py --config-file ../configs/coco/panoptic-segmentation/maskformer2_R50_bs16_50ep.yaml \
+  --input input1.jpg  \
+  --output output/         \
   --opts MODEL.WEIGHTS /path/to/checkpoint_file
 ```
 The configs are made for training, therefore we need to specify `MODEL.WEIGHTS` to a model from model zoo for evaluation.
-This command will run the inference and show visualizations in an OpenCV window.
-
-For details of the command line arguments, see `demo.py -h` or look at its source code
-to understand its behavior. Some common arguments are:
-* To run __on your webcam__, replace `--input files` with `--webcam`.
-* To run __on a video__, replace `--input files` with `--video-input video.mp4`.
-* To run __on cpu__, add `MODEL.DEVICE cpu` after `--opts`.
-* To save outputs to a directory (for images) or a file (for webcam or video), use `--output`.
 
 
 ### Training & Evaluation in Command Line

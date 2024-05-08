@@ -1,11 +1,11 @@
-_BASE_: Base-Cityscapes-SemanticSegmentation_hrnet.yaml
+_BASE_: Base-SemanticSegmentation_naive_concat.yaml
 MODEL:
-  META_ARCHITECTURE: "HRNet_W48_ARCH"
+  META_ARCHITECTURE: "HRNet_W48_Naive_Concat_ARCH"
+  PRETRAINING: False
   SEM_SEG_HEAD:
-    NAME: "HRNet_W48_mulhead"
+    NAME: "HRNet_W48_naive_concat"
     OUTPUT_FEAT_DIM: 512
-    WITH_DATASETS_AUX: False
-    BN_TYPE: "torchbn"
+    BN_TYPE: "torchsyncbn"
   GNN:
     GNN_MODEL_NAME: "Learnable_Topology_BGNN_llama"
     NFEAT: 4096
@@ -26,5 +26,5 @@ MODEL:
     GNN_ITERS: 20000
     SEG_ITERS: 20000
     FIRST_STAGE_GNN_ITERS: 15000
+    FINETUNE_STAGE1_ITERS: 50000
     INIT_ADJ_PATH: None
-    N_POINTS: 1024

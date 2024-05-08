@@ -41,10 +41,12 @@ from detectron2.evaluation import (
     LVISEvaluator,
     SemSegEvaluator,
     verify_results,
+    
 )
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
+
 
 # MaskFormer
 from mask2former import (
@@ -55,15 +57,61 @@ from mask2former import (
     MaskFormerPanopticDatasetMapper,
     MaskFormerSemanticDatasetMapper,
     MaskFormerSemanticDatasetMapper_2,
+    SemanticDatasetMapper,
     SemanticSegmentorWithTTA,
     add_maskformer2_config,
+    add_hrnet_config,
+    add_gnn_config,
+    LoaderAdapter,
+    build_bipartite_graph_for_unseen,
+    eval_for_mseg_datasets,
+    UniDetLearnUnifyLabelSpace
 )
+
+from PIL import Image
+from detectron2.utils.file_io import PathManager
+import numpy as np
+from functools import partial
+from detectron2.structures import ImageList
+import torch.nn.functional as F
+import logging
+
+from mask2former.utils.evaluate import eval_link_hook, iter_info_hook, find_unuse_hook, print_unify_label_space
+
+
+logger = logging.getLogger(__name__)
+def my_sem_seg_loading_fn(filename, dtype=int, lb_map=None, size_divisibility=-1, ignore_label=255):
+    with PathManager.open(filename, "rb") as f:
+        image = np.array(Image.open(f), copy=False, dtype=dtype)
+        if lb_map is not None:
+            image = lb_map[image] 
+
+    #     logger.info(f'size_divisibility: {size_divisibility}')
+    #     if size_divisibility > 0:
+    #         image = torch.tensor(image)
+            
+    #         image_size = (image.shape[0], image.shape[1])
+    #         padding_size = [
+    #             0,
+    #             size_divisibility - image_size[1],
+    #             0,
+    #             size_divisibility - image_size[0],
+    #         ]
+            
+    #         image = F.pad(image, padding_size, value=ignore_label).contiguous()
+    #         logger.info(f'image shape: {image.shape}')
+    #         image = image.numpy()
+
+    # dsaf
+    return image
+    
 
 
 class Trainer(DefaultTrainer):
     """
     Extension of the Trainer class adapted to MaskFormer.
     """
+
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -74,17 +122,24 @@ class Trainer(DefaultTrainer):
         evaluator manually in your script and do not have to worry about the
         hacky if-else logic here.
         """
+        logger.info(f"build evaluator:{dataset_name}")
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
         evaluator_list = []
         evaluator_type = MetadataCatalog.get(dataset_name).evaluator_type
         # semantic segmentation
         if evaluator_type in ["sem_seg", "ade20k_panoptic_seg"]:
+            lb_map = np.arange(256).astype(np.uint8)
+            lookup_table = MetadataCatalog.get(dataset_name).thing_dataset_id_to_contiguous_id
+            for k, v in lookup_table.items():
+                lb_map[k] = v
+            logger.info(f"evaluator_type:{dataset_name}")
             evaluator_list.append(
                 SemSegEvaluator(
                     dataset_name,
                     distributed=True,
                     output_dir=output_folder,
+                    sem_seg_loading_fn=partial(my_sem_seg_loading_fn, lb_map=lb_map, size_divisibility=cfg.INPUT.SIZE_DIVISIBILITY, ignore_label=cfg.DATASETS.IGNORE_LB)
                 )
             )
         # instance segmentation
@@ -172,6 +227,12 @@ class Trainer(DefaultTrainer):
         elif cfg.INPUT.DATASET_MAPPER_NAME == "coco_panoptic_lsj":
             mapper = COCOPanopticNewBaselineDatasetMapper(cfg, True)
             return build_detection_train_loader(cfg, mapper=mapper)
+        elif cfg.INPUT.DATASET_MAPPER_NAME == 'SemanticDatasetMapper':
+            mapper = SemanticDatasetMapper(cfg, True)
+            return build_detection_train_loader(cfg, mapper=mapper)
+        elif cfg.INPUT.DATASET_MAPPER_NAME == 'DALI':
+            # return DaLiLoaderAdapter(cfg, aux_mode='train')
+            return LoaderAdapter(cfg, aux_mode='train')
         else:
             mapper = None
             return build_detection_train_loader(cfg, mapper=mapper)
@@ -183,6 +244,33 @@ class Trainer(DefaultTrainer):
         Overwrite it if you'd like a different scheduler.
         """
         return build_lr_scheduler(cfg, optimizer)
+
+    @classmethod
+    def build_test_loader(cls, cfg, dataset_name):
+        if 'cs' in dataset_name:
+            dataset_id = 0            
+        elif 'mapi' in dataset_name:
+            dataset_id = 1
+        elif 'sunrgbd' in dataset_name:
+            dataset_id = 2
+        elif 'bdd' in dataset_name:
+            dataset_id = 3
+        elif 'idd' in dataset_name:
+            dataset_id = 4
+        elif 'ade' in dataset_name:
+            dataset_id = 5
+        elif 'coco' in dataset_name:
+            dataset_id = 6
+        elif 'wilddash' in dataset_name:
+            dataset_id = 0
+        else:
+            dataset_id = 0
+        # dataset_id = 0
+        aux_mode = 'test'
+        if '_2' in dataset_name:
+            aux_mode = 'eval'
+            
+        return LoaderAdapter(cfg, aux_mode=aux_mode, dataset_id=dataset_id)
 
     @classmethod
     def build_optimizer(cls, cfg, model):
@@ -211,7 +299,7 @@ class Trainer(DefaultTrainer):
         memo: Set[torch.nn.parameter.Parameter] = set()
         for module_name, module in model.named_modules():
             for module_param_name, value in module.named_parameters(recurse=False):
-                if not value.requires_grad:
+                if not value.requires_grad and 'adj_matrix' not in module_param_name:
                     continue
                 # Avoid duplicating parameters
                 if value in memo:
@@ -289,7 +377,9 @@ def setup(args):
     cfg = get_cfg()
     # for poly lr schedule
     add_deeplab_config(cfg)
-    add_maskformer2_config(cfg)
+    add_hrnet_config(cfg)
+    add_gnn_config(cfg)
+    # add_maskformer2_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.freeze()
@@ -298,29 +388,52 @@ def setup(args):
     setup_logger(output=cfg.OUTPUT_DIR, distributed_rank=comm.get_rank(), name="mask2former")
     return cfg
 
+def build_bipart_for_unseen(cfg, model):
+    """
+    Build bipartite graph for unseen classes.
+    """
+    from mask2former.utils import build_bipartite_graph_for_unseen
+    build_bipartite_graph_for_unseen(cfg, model)
+    
 
 def main(args):
     cfg = setup(args)
-
+    
     if args.eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
+        # eval_for_mseg_datasets(Trainer.build_test_loader, cfg, model)
+        if args.unseen:
+            build_bipartite_graph_for_unseen(Trainer.build_test_loader, cfg, model)
+        # print_unify_label_space(Trainer.build_test_loader, model, cfg)
+        # return
         res = Trainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
         if comm.is_main_process():
             verify_results(cfg, res)
         return res
-
-    trainer = Trainer(fg)
+        # return
+    
+    trainer = Trainer(cfg)
+    trainer.register_hooks([iter_info_hook(), UniDetLearnUnifyLabelSpace()])
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
 
+def argument_parser():
+    parser = default_argument_parser()
+    parser.add_argument(
+        "--unseen",
+        action="store_true",
+        help="Whether to evaluate unseen datasets. ",
+    )
+    return parser
+
 
 if __name__ == "__main__":
-    args = default_argument_parser().parse_args()
+    args = argument_parser().parse_args()
     print("Command Line Args:", args)
     launch(
         main,

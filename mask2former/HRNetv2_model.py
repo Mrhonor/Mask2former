@@ -155,10 +155,10 @@ class HRNet_W48_ARCH(nn.Module):
         graph_node_features = gen_graph_node_feature(cfg)
         init_gnn_iters = cfg.MODEL.GNN.init_stage_iters
         Pretraining = cfg.MODEL.PRETRAINING
-        if Pretraining:
-            gnn_model = None
-        else:
-            gnn_model = build_GNN_module(cfg)
+        # if Pretraining:
+        #     gnn_model = None
+        # else:
+        gnn_model = build_GNN_module(cfg)
             
         gnn_iters = cfg.MODEL.GNN.GNN_ITERS
         seg_iters = cfg.MODEL.GNN.SEG_ITERS
@@ -168,8 +168,8 @@ class HRNet_W48_ARCH(nn.Module):
         with_orth_loss = cfg.LOSS.WITH_ORTH_LOSS  
         with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
         n_points = cfg.MODEL.GNN.N_POINTS
-        # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 3, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 3, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
-        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 1, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
+        # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 3, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 3, "loss_ce6": 3, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
+        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 1, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 15, "loss_ce6": 15, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
         # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 2, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 3, "loss_ce5": 3, "loss_ce6": 1, "loss_aux0": 1, "loss_aux1": 2, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 3, "loss_aux5": 3, "loss_aux6": 1, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
         return {
             'backbone': backbone,
@@ -235,7 +235,6 @@ class HRNet_W48_ARCH(nn.Module):
 
             if self.training:
                             # bipartite matching-based loss
-                
                 losses = self.clac_pretrain_loss(batched_inputs, images, targets, dataset_lbs, outputs)
                 # losses = self.MdsOhemLoss(outputs['logits'], targets, dataset_lbs)
                         
@@ -256,23 +255,23 @@ class HRNet_W48_ARCH(nn.Module):
                     logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     
                     logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                    uni_logit = F.interpolate(uni_logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                    # uni_logit = F.interpolate(uni_logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
                     
-                    uni_logit = retry_if_cuda_oom(sem_seg_postprocess)(uni_logit, image_size, height, width)
-                    # logger.info(f"logit shape:{uni_logit.shape}")
-                    if self.dataset_adapter[0] is not None:
-                    # logger.info(uni_logits.shape)
-                        preds = torch.argmax(logit, dim=0, keepdim=True).long()
-                        this_mseg_map = self.dataset_adapter[0]
-                        # logger.info(this_mseg_map)      
+                    # uni_logit = retry_if_cuda_oom(sem_seg_postprocess)(uni_logit, image_size, height, width)
+                    # # logger.info(f"logit shape:{uni_logit.shape}")
+                    # if self.dataset_adapter[0] is not None:
+                    # # logger.info(uni_logits.shape)
+                    #     preds = torch.argmax(logit, dim=0, keepdim=True).long()
+                    #     this_mseg_map = self.dataset_adapter[0]
+                    #     # logger.info(this_mseg_map)      
 
-                        preds = this_mseg_map[preds].long()
-                            # 创建一个与原张量相同大小的全零张量
-                        output = torch.zeros(int(torch.max(this_mseg_map)+1), preds.shape[1], preds.shape[2]).cuda()
+                    #     preds = this_mseg_map[preds].long()
+                    #         # 创建一个与原张量相同大小的全零张量
+                    #     output = torch.zeros(int(torch.max(this_mseg_map)+1), preds.shape[1], preds.shape[2]).cuda()
                         
-                        # 将最大值所在位置置为 1
-                        output.scatter_(0, preds, 1)
-                        logit = output
+                    #     # 将最大值所在位置置为 1
+                    #     output.scatter_(0, preds, 1)
+                    #     logit = output
 
                     processed_results.append({"sem_seg": logit, "uni_logits":uni_logit})
                 return processed_results

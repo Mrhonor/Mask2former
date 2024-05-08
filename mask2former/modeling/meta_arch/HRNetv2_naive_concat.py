@@ -113,7 +113,7 @@ class ProjectionHead(nn.Module):
         return feat
 
 @SEM_SEG_HEADS_REGISTRY.register()
-class HRNet_W48_mulhead(nn.Module):
+class HRNet_W48_naive_concat(nn.Module):
     """
     deep high-resolution representation learning for human pose estimation, CVPR2019
     """
@@ -127,7 +127,7 @@ class HRNet_W48_mulhead(nn.Module):
                 bn_type,
                 input_shape,
                 configer):
-        super(HRNet_W48_mulhead, self).__init__()
+        super(HRNet_W48_naive_concat, self).__init__()
         self.aux_mode = aux_mode
         # self.num_unify_classes = num_unify_classes')
         self.datasets_cats = datasets_cats
@@ -161,21 +161,13 @@ class HRNet_W48_mulhead(nn.Module):
                 ))
             
 
-        self.unify_prototype = nn.ParameterList([nn.Parameter(torch.zeros(n_cat, self.output_feat_dim),
-                                requires_grad=True) for n_cat in self.datasets_cats])
-        _= [trunc_normal_(proto, std=0.02) for proto in self.unify_prototype]
+        self.unify_prototype = nn.Parameter(torch.zeros(num_unify_class, self.output_feat_dim),
+                                requires_grad=True)
+        trunc_normal_(self.unify_prototype, std=0.02)
         
         self.with_datasets_aux = with_datasets_aux
-        if self.with_datasets_aux:
-            self.aux_prototype = nn.ParameterList([])
-            for i in range(0, self.n_datasets):
-                self.aux_prototype.append(nn.Parameter(torch.zeros(self.datasets_cats[i], self.output_feat_dim),
-                                        requires_grad=True))
-                trunc_normal_(self.aux_prototype[i], std=0.02)
-
         self.init_weights()    
-        # if self.num_unify_class == self.total_cats:
-        #     self.get_encode_lb_vec()
+
         
 
     @classmethod
@@ -213,37 +205,10 @@ class HRNet_W48_mulhead(nn.Module):
 
         feats = torch.cat([feat1, feat2, feat3, feat4], 1)
         emb = self.proj_head(feats)
-        remap_logits = []
-        uni_logits = []
-        if self.training:
-            for i in range(self.n_datasets):
-                if not (dataset_ids == i).any():
-                    continue
-                logits = torch.einsum('bchw, nc -> bnhw', emb[dataset_ids == i], self.unify_prototype[i])
-                remap_logits.append(logits)
-            return {'logits':remap_logits}
-        else:
-            cats_unify_prototype = torch.cat([*self.unify_prototype], dim=0)
-            if not isinstance(dataset_ids, int):
-                for i in range(self.n_datasets):
-                    if not (dataset_ids == i).any():
-                        continue
-                logits = torch.einsum('bchw, nc -> bnhw', emb[dataset_ids == i], self.unify_prototype[i])
-                
-                remap_logits.append(logits)
-                uni_logit = torch.einsum('bchw, nc -> bnhw', emb[dataset_ids == i], cats_unify_prototype)
-                uni_logits.append(uni_logit)
-            else:
-                logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype[dataset_ids])
-                remap_logits.append(logits)
-                uni_logit = torch.einsum('bchw, nc -> bnhw', emb, cats_unify_prototype)
-                uni_logits.append(uni_logit)
+
+        logits = torch.einsum('bchw, nc -> bnhw', emb, self.unify_prototype.to(emb.dtype))
             
-            
-            
-            return {'logits':remap_logits, 'uni_logits':uni_logits}
-                
-        
+        return {'logits':logits, 'emb':emb}
 
     def req_grad(self, isFrooze):
         for name, param in self.named_parameters():
@@ -348,6 +313,7 @@ class HRNet_W48_mulhead(nn.Module):
                 text_feature_vecs.append(text_features)
                 
         text_feature_vecs = torch.cat(text_feature_vecs, dim=0)
+        print(f"text_feature shape:{text_feature_vecs.shape}")
         self.unify_prototype.data = text_feature_vecs
         self.unify_prototype.requires_grad=False
                 

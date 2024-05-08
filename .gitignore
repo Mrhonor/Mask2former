@@ -39,6 +39,8 @@ model_ts*.txt
 *.swp
 *~
 
+core*
+
 # editor settings
 .idea
 .vscode

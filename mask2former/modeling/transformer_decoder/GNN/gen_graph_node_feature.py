@@ -679,7 +679,7 @@ def gen_image_features_storage(configer, dataset_id):
 
 
 def get_encode_lb_vec(configer, datasets_id=None):
-    ori_model_path = '/cpfs01/projects-HDD/pujianxiangmuzu_HDD/mr_22210240239/llama-2-7b-hf'
+    ori_model_path = osp.join(os.getcwd(), 'llama-2-7b-hf')
     # param_json = 'llama-2-7b/params.json'
     config_kwargs = {
         "trust_remote_code": True,
@@ -712,6 +712,9 @@ def get_encode_lb_vec(configer, datasets_id=None):
                 continue
             lb_name = configer.get("dataset"+str(i+1), "label_names")
             for lb in lb_name:
+                # from_sta = lb.find('from')
+                # from_end = lb.find('.', from_sta)
+                # lb = lb[:from_sta-1] + lb[from_end:]
                 tokens = tokenizer.encode_plus(lb, add_special_tokens=True, padding='max_length', truncation=True,
                                         max_length=128, return_tensors='pt')
                 input_ids = tokens["input_ids"]

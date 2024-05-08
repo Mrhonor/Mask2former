@@ -23,7 +23,7 @@ import torch.utils.model_zoo as model_zoo
 logger = logging.getLogger(__name__)
 
 @META_ARCH_REGISTRY.register()
-class HRNet_W48_Finetune_ARCH(nn.Module):
+class HRNet_W48_Naive_Concat_ARCH(nn.Module):
     """
     deep high-resolution representation learning for human pose estimation, CVPR2019
     """
@@ -47,13 +47,13 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 with_orth_loss,
                 with_adj_loss
                 ):
-        super(HRNet_W48_Finetune_ARCH, self).__init__()
+        super(HRNet_W48_Naive_Concat_ARCH, self).__init__()
         self.num_unify_classes = num_unify_classes
 
         self.datasets_cats = datasets_cats
         self.n_datasets = len(self.datasets_cats)
         self.backbone = backbone
-        self.gnn_model = gnn_model
+        self.gnn_model = None
         self.size_divisibility = size_divisibility
         self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
@@ -69,19 +69,22 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         self.finetune_stage1_iters = finetune_stage1_iters
         self.with_datasets_aux = with_datasets_aux
         self.proj_head = sem_seg_head # ProjectionHead(dim_in=in_channels, proj_dim=self.output_feat_dim, bn_type=bn_type)
-        self.proj_head.req_grad(True)
         self.graph_node_features = graph_node_features.cuda()
         self.iters = 0
         self.total_cats = 0
+        self.acc_cats = []
         # self.datasets_cats = []
         self.dataset_adapter = []
         for i in range(0, self.n_datasets):
             # self.datasets_cats.append(self.configer.get('dataset'+str(i+1), 'n_cats'))
+            self.acc_cats.append(self.total_cats)
             self.total_cats += self.datasets_cats[i]
             self.dataset_adapter.append(None)
- 
-        self.criterion = OhemCELoss(ohem_thresh, ignore_lb)
+            
         
+        self.ignore_lb = self.total_cats
+ 
+        self.criterion = OhemCELoss(ohem_thresh, self.ignore_lb)
         
         # 初始化 grad
         self.initial = False
@@ -109,7 +112,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         backbone = build_backbone(cfg)
         sem_seg_head = build_sem_seg_head(cfg, 720)
         # sem_seg_head = build_sem_seg_head(cfg, backbone.num_features)
-        gnn_model = build_GNN_module(cfg)
+        gnn_model = None
         datasets_cats = cfg.DATASETS.DATASETS_CATS
         ignore_lb = cfg.DATASETS.IGNORE_LB
         ohem_thresh = cfg.LOSS.OHEM_THRESH
@@ -121,7 +124,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
         with_spa_loss = cfg.LOSS.WITH_SPA_LOSS
         with_orth_loss = cfg.LOSS.WITH_ORTH_LOSS  
         with_adj_loss = cfg.LOSS.WITH_ADJ_LOSS 
-        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 2, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 2, "loss_ce6": 2, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 2, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
+        loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 3, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 1, "loss_ce5": 3, "loss_ce6": 3, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 2, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
         # loss_weight_dict = {"loss_ce0": 1, "loss_ce1": 2, "loss_ce2": 1, "loss_ce3": 1, "loss_ce4": 3, "loss_ce5": 3, "loss_ce6": 2, "loss_aux0": 1, "loss_aux1": 3, "loss_aux2": 1, "loss_aux3": 1, "loss_aux4": 1, "loss_aux5": 3, "loss_aux6": 2, "loss_spa": 0.001, "loss_adj":1, "loss_orth":10}
         
         return {
@@ -146,9 +149,7 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
 
 
     def forward(self, batched_inputs, dataset=0):
-        if self.training:
-            self.env_init()
-        
+
         images = [x["image"].cuda() for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
         # if self.training:
@@ -162,9 +163,6 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             targets = torch.cat(targets, dim=0)
             dataset_lbs = [x["dataset_id"] for x in batched_inputs]
             dataset_lbs = torch.tensor(dataset_lbs).long().cuda()
-            targets = [x["sem_seg"].cuda() for x in batched_inputs]
-            targets = self.prepare_targets(targets, images)
-            targets = torch.cat(targets, dim=0)
         else:
             if "dataset_id" in batched_inputs[0]: 
                 dataset_lbs = int(batched_inputs[0]["dataset_id"])
@@ -172,34 +170,28 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
                 dataset_lbs = dataset
             # dataset_lbs = 6
 
-
-        
-
         features = self.backbone(images.tensor)
         outputs = self.proj_head(features, dataset_lbs)
         
         if self.training:
                         # bipartite matching-based loss
             remap_logits = outputs['logits']
-            if self.with_datasets_aux:
-                aux_logits_out = outputs['aux_logits']
+
             losses = {}
-            for id, logit in enumerate(remap_logits):
-                logits = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                loss = self.criterion(logits, targets[dataset_lbs==id])
-                # logger.info(f"loss:{loss}")
+            # for id, logit in enumerate(remap_logits):
+            for idx in range(self.n_datasets):
+                if not (dataset_lbs == idx).any():
+                    continue
+                logits = F.interpolate(remap_logits[dataset_lbs==idx], size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
+                this_target = targets[dataset_lbs==idx]
+                add_target = this_target + self.acc_cats[idx]
+                add_target[this_target==255] = self.ignore_lb
+                loss = self.criterion(logits, add_target)
+
                 if torch.isnan(loss):
                     continue
-                losses[f'loss_ce{id}'] = loss
+                losses[f'loss_ce{idx}'] = loss
             
-            if self.with_datasets_aux:
-                for idx, aux_logits in enumerate(aux_logits_out):
-                
-                    aux_logits = F.interpolate(aux_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                    aux_loss = self.criterion(aux_logits, targets[dataset_lbs==idx])
-                    if torch.isnan(aux_loss):
-                        continue
-                    losses[f'loss_aux{idx}'] = aux_loss
             for k in list(losses.keys()):
                 if k in self.loss_weight_dict:
                     losses[k] *= self.loss_weight_dict[k]
@@ -209,72 +201,44 @@ class HRNet_W48_Finetune_ARCH(nn.Module):
             return losses
         else:
             processed_results = []
-            for logit, input_per_image, image_size, uni_logits in zip(outputs['logits'], batched_inputs, images.image_sizes, outputs['uni_logits']):
-                height = input_per_image.get("height", image_size[0])
-                width = input_per_image.get("width", image_size[1])
-                logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)
-                # uni_logits = logit
-                # uni_logits = F.interpolate(uni_logits, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="bilinear", align_corners=True)
-                # uni_logits = retry_if_cuda_oom(sem_seg_postprocess)(uni_logits, image_size, height, width)
-                # dataset_lbs = 0
-                if self.dataset_adapter[dataset_lbs] is not None:
-                    # logger.info(uni_logits.shape)
-                    uni_logits = F.softmax(uni_logits, dim=0)
-                    max_logits, preds = torch.max(uni_logits, dim=0, keepdim=True)
-                    # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
-                    preds = preds.long()
-                    # preds[max_logits < 0.3] = 255
-                    this_mseg_map = self.dataset_adapter[dataset_lbs]
-                    # logger.info(this_mseg_map)      
 
-                    preds = this_mseg_map[preds].long()
-                        # 创建一个与原张量相同大小的全零张量
-                    output = torch.zeros(int(torch.max(this_mseg_map)), preds.shape[1], preds.shape[2]).cuda()
-                    # preds[max_logits < 0.3] = int(torch.max(this_mseg_map)) - 1
-                    # 将最大值所在位置置为 1
-                    output.scatter_(0, preds, 1)
-                    logit = output
-                
-                # logit = F.softmax(logit, dim=0)
-                # max_logits, preds = torch.max(logit, dim=0, keepdim=True)
-                # # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
-                # preds = preds.long()
-                # output = torch.zeros(26, preds.shape[1], preds.shape[2]).cuda()
-                # preds[max_logits < 0.3] = 25
-                # # 将最大值所在位置置为 1
-                # output.scatter_(0, preds, 1)
-                # logit = output
-                # logger.info(f"logit shape:{logit.shape}")
-                processed_results.append({"sem_seg": logit, "uni_logits": uni_logits})
+            logit = outputs['logits']
+            input_per_image = batched_inputs[0]
+            image_size = images.image_sizes[0]
+            height = input_per_image.get("height", image_size[0])
+            width = input_per_image.get("width", image_size[1])
+            # dataset_lbs = 0
+            # logit = F.softmax(logit, dim=1)
+            # max_logits, preds = torch.max(logit, dim=1, keepdim=True)
+            # # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+            # preds = preds.long()
+            # preds = preds - self.acc_cats[dataset_lbs]
+            # preds[preds > self.datasets_cats[dataset_lbs]] = self.datasets_cats[dataset_lbs]
+            # preds[preds < 0] = self.datasets_cats[dataset_lbs]
+            # output = torch.zeros(preds.shape[0], self.datasets_cats[dataset_lbs]+1, preds.shape[2], preds.shape[3]).cuda()
+            
+            # # 将最大值所在位置置为 1
+            # output.scatter_(1, preds, 1)
+            # logit = output
+            # print(self.acc_cats[dataset_lbs])
+            logit = logit[:, self.acc_cats[dataset_lbs]:self.acc_cats[dataset_lbs]+self.datasets_cats[dataset_lbs], :, :]
+            logit = F.interpolate(logit, size=(images.tensor.shape[2], images.tensor.shape[3]), mode="nearest")
+
+            logit = retry_if_cuda_oom(sem_seg_postprocess)(logit, image_size, height, width)                
+            # logit = F.softmax(logit, dim=0)
+            # max_logits, preds = torch.max(logit, dim=0, keepdim=True)
+            # # preds = torch.argmax(uni_logits, dim=0, keepdim=True).long()
+            # preds = preds.long()
+            # output = torch.zeros(26, preds.shape[1], preds.shape[2]).cuda()
+            # preds[max_logits < 0.3] = 25
+            # # 将最大值所在位置置为 1
+            # output.scatter_(0, preds, 1)
+            # logit = output
+            # logger.info(f"logit shape:{logit.shape}")
+            processed_results.append({"sem_seg": logit})
             return processed_results             
 
-    def env_init(self):
-        # if int(self.proto_init) == 0:
-        #     self.gnn_model.set_init_stage(False)
-        #     unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
-        #     self.proj_head.set_bipartite_graphs(bi_graphs)
-        #     self.proj_head.set_unify_prototype(unify_prototype, grad=False)
-        #     self.proto_init = torch.ones(1)
-            
-        if self.initial == False:
-            logger.info(f"initial: finetune_stage: {self.finetune_stage}")
-            self.backbone.req_grad(True)
-            self.proj_head.req_grad(True)
-            self.gnn_model.req_grad(False)
-            self.backbone.train()
-            self.proj_head.train()
-            self.gnn_model.eval()
-            self.initial = True
 
-        if int(self.proto_init) == 0:
-            logger.info(f"initial: finetune_stage: {self.finetune_stage}")
-            self.gnn_model.set_init_stage(False)
-            unify_prototype, bi_graphs = self.gnn_model.get_optimal_matching(self.graph_node_features, True)
-            self.proj_head.set_bipartite_graphs(bi_graphs)
-            self.proj_head.set_unify_prototype(unify_prototype.detach().float(), grad=True)
-            self.proto_init.data = torch.ones(1)
-                
                     
 
     def prepare_targets(self, targets, images):

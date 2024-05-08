@@ -273,15 +273,15 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             return predHist
     
     
-        if osp.exists(f"Predhist_{n_datasets}_llm_fixbug.pickle"):
-            with open(f"Predhist_{n_datasets}_llm_fixbug.pickle", "rb") as file:
+        if osp.exists(f"Predhist_{n_datasets}_mulhead.pickle"):
+            with open(f"Predhist_{n_datasets}_mulhead.pickle", "rb") as file:
                 Predhist = pickle.load(file)
             # for name, hist in Predhist.items():
             #     del hist[name]
         else:
             Predhist = eval_cross_head_and_datasets()
             # Predhist = Get_Predhist_by_llm()
-            with open(f"Predhist_{n_datasets}_llm_fixbug.pickle", "wb") as file:
+            with open(f"Predhist_{n_datasets}_mulhead.pickle", "wb") as file:
                 pickle.dump(Predhist, file)
 
         # logger.info(Predhist)
@@ -564,7 +564,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
         }
         n2 = max_new_nodes[2]
         # tau = 0.2
-        tau = 0.2
+        tau = 0.4
         oo = 2000
 
         # Initialize two-node merge
@@ -746,6 +746,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
             head_str = head_str + ', {}'.format(head)
         print(head_str)
         cnt = 0
+        target_bi = torch.zeros(total_cats, total_cats)
         for i, s in enumerate(sol_x):
             if s > 0.1:
                 inds = top_clusters[i][1:]
@@ -761,7 +762,6 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 for d in print_order[1:]:
                     unified_name = unified_name + '_{}'.format(dataset_name[d].replace(',', '_'))
                 print(unified_name, end='')
-                cnt = cnt + 1
                 for d in print_order:
                     # if d == 'oid':
                     #     print(', {}, {}'.format(oidname2freebase[dataset_name[d]], dataset_name[d]), end='')
@@ -771,9 +771,14 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                     if dataset_name[d] != '':
                         meta = MetadataCatalog.get(d)
                         stuff_class = meta.stuff_classes
-                        print(', {}'.format(stuff_class.index(dataset_name[d])), end='')
+                        this_class_idx = stuff_class.index(dataset_name[d])
+                        target_bi[dataset_range[d][0]+this_class_idx][cnt] = 1
+                        print(', {}'.format(this_class_idx), end='')
+                        
                     else:
                         print(', {}'.format(dataset_name[d]), end='')
+                        
+                cnt = cnt + 1
                 print()
         for ind in range(len(names)):
             if not merged[ind]:
@@ -787,7 +792,7 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                 for d in print_order[1:]:
                     unified_name = unified_name + '_{}'.format(dataset_name[d].replace(',', '_'))
                 print(unified_name, end='')
-                cnt = cnt + 1
+                
                 for d in print_order:
                     # if d == 'oid':
                     #     print(', {}, {}'.format(oidname2freebase[dataset_name[d]], dataset_name[d]), end='')
@@ -796,12 +801,16 @@ class UniDetLearnUnifyLabelSpace(HookBase):
                     if dataset_name[d] != '':
                         meta = MetadataCatalog.get(d)
                         stuff_class = meta.stuff_classes
-                        print(', {}'.format(stuff_class.index(dataset_name[d])), end='')
+                        this_class_idx = stuff_class.index(dataset_name[d])
+                        target_bi[dataset_range[d][0]+this_class_idx][cnt] = 1
+                        print(', {}'.format(this_class_idx), end='')
                     else:
                         print(', {}'.format(dataset_name[d]), end='')
+                cnt = cnt + 1
                 print()
         print()
         print('num_cats', cnt)
+        torch.save(target_bi, f'init_adjacency.pt')
 
         # cnt = 0
         # for i, s in enumerate(sol_x):

@@ -12,3 +12,4 @@ from .meta_arch.HRNetv2_llama import HRNet_W48_llama
 from .meta_arch.semseg import SemsegModel
 from .meta_arch.HRNetv2_llama import HRNet_W48_llama
 from .meta_arch.HRNetv2_mulhead import HRNet_W48_mulhead
+from .meta_arch.HRNetv2_naive_concat import HRNet_W48_naive_concat
